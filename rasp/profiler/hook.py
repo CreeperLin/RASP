@@ -5,9 +5,9 @@ from rasp.utils.config import CFG
 import rasp.device as DEV
 
 class Tape():
-    def __init__(self, node, is_set=False):
-        self.tape = set() if is_set else list()
-        self.add = self.tape.add if is_set else self.tape.append
+    def __init__(self, node):
+        self.tape = list()
+        self.add = self.tape.append
         self.node = node
         self.accessed = False
     
@@ -34,11 +34,13 @@ class Tape():
 
     @property
     def items_all(self):
-        tape = set() if is_set else list()
+        tape = list()
         for i in self.tape:
-            for it in i.items_all:
-                if is_set: tape.add(it)
-                else: tape.append(it)
+            if i.num_children == 0:
+                tape.append(i)
+                continue
+            for it in i.tape.items_all:
+                tape.append(it)
         for i in tape:
             yield i
     

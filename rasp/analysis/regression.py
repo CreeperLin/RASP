@@ -3,22 +3,23 @@ import os
 import sys
 import numpy as np
 import sklearn
+from rasp.utils.config import CFG
 
-def get_linear_model(config):
+def get_linear_model():
     from sklearn.linear_model import LinearRegression
     model = LinearRegression(
 
     )
     return model
 
-def get_ridge_model(config):
+def get_ridge_model():
     from sklearn.linear_model import Ridge
     model = Ridge(
         alpha=.5,
     )
     return model
 
-def get_xgboost_model(config):
+def get_xgboost_model():
     import xgboost as xgb
     model = xgb.XGBRegressor(
                 learning_rate =0.1,
@@ -31,7 +32,7 @@ def get_xgboost_model(config):
                 seed=27)
     return model
 
-def get_mlp_model(config):
+def get_mlp_model():
     from sklearn.neural_network import MLPRegressor
     model = MLPRegressor(
         hidden_layer_sizes=(3, ),
@@ -47,9 +48,9 @@ model_creator = {
     'mlp': get_mlp_model,
 }
 
-def get_regress_model(config, model_desc):
+def get_regress_model(model_desc):
     if model_desc in model_creator:
-        model = model_creator[model_desc](config)
+        model = model_creator[model_desc]()
     else:
         raise ValueError('unsupported model')
     return model
@@ -58,10 +59,10 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
 class Regressor():
-    def __init__(self, config, model=None):
+    def __init__(self, model=None):
         super().__init__()
-        model = config.analysis.regress_model
-        self.model = get_regress_model(config, model)
+        model = model or CFG.analysis.regress_model
+        self.model = get_regress_model(model)
 
     def set_vars(self, observe, target):
         self.var_observe = observe or self.var_observe

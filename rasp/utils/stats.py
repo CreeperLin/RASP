@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from rasp.profiler.hook import hook_compute, unhook_compute, hook_timing, unhook_timing, hook_all, unhook_all
-from rasp.profiler.tree import build_stats_tree, reset_timing_all
+from rasp.profiler.tree import build_stats_tree, destroy_stats_tree, reset_timing_all
 from rasp.utils.config import CFG
 from rasp.utils.time import Timer, get_cpu_time
 from rasp.utils.reporter import report, save_report, summary
@@ -92,5 +92,4 @@ def profile_on(module):
 
 def profile_off(module):
     unhook_all(module)
-    for m in module.modules():
-        del m._RASPStatNode
+    destroy_stats_tree(module)

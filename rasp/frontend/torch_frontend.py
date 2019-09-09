@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
@@ -26,10 +27,15 @@ def reg_conv(m):
     }
 
 def reg_pool(m):
+    typestr = str(type(m).__name__)
+    ptype = 'avg' if typestr.find('Max') == -1 else 'max'
+    adapt = False if typestr.find('Adaptive') == -1 else True
     return {
-        'kernel_size': m.kernel_size,
-        'stride': m.stride,
-        'padding': m.padding,
+        'kernel_size': 0 if adapt else m.kernel_size,
+        'stride': 0 if adapt else m.stride,
+        'padding': 0 if adapt else m.padding,
+        'pool_type': ptype,
+        'adaptive': adapt,
     }
 
 def reg_bn(m):
@@ -55,12 +61,7 @@ def reg_upsample(m):
     return {
         'C_in': m.in_channels,
         'C_out': m.out_channels,
-        'kernel_size': m.kernel_size,
-        'stride': m.stride,
-        'padding': m.padding,
-        'bias': False if m.bias is None else True,
-        'dilation': m.dilation,
-        'groups': m.groups,
+        'mode': m.mode
     }
 
 def reg_stat(node, module):
@@ -84,24 +85,53 @@ def reg_stat(node, module):
         m_stats = {}
     node.update_values(m_stats)
 
+_stdtype_map = {
+    nn.Conv1d: 'CONV',
+    nn.Conv2d: 'CONV',
+    nn.Conv3d: 'CONV',
+    nn.ConvTranspose1d: 'CONV',
+    nn.ConvTranspose2d: 'CONV',
+    nn.ConvTranspose3d: 'CONV',
+
+    nn.BatchNorm1d: 'BN',
+    nn.BatchNorm2d: 'BN',
+    nn.BatchNorm3d: 'BN',
+
+    nn.ReLU: 'ACT',
+    nn.ReLU6: 'ACT',
+    nn.PReLU: 'ACT',
+    nn.ELU: 'ACT',
+    nn.LeakyReLU: 'ACT',
+
+    nn.MaxPool1d: 'POOL',
+    nn.MaxPool2d: 'POOL',
+    nn.MaxPool3d: 'POOL',
+    nn.AdaptiveMaxPool1d: 'POOL',
+    nn.AdaptiveMaxPool2d: 'POOL',
+    nn.AdaptiveMaxPool3d: 'POOL',
+
+    nn.AvgPool1d: 'POOL',
+    nn.AvgPool2d: 'POOL',
+    nn.AvgPool3d: 'POOL',
+    nn.AdaptiveAvgPool1d: 'POOL',
+    nn.AdaptiveAvgPool2d: 'POOL',
+    nn.AdaptiveAvgPool3d: 'POOL',
+
+    nn.Linear: 'FC',
+    nn.Dropout: 'NONE',
+
+    nn.Upsample: 'UPSMPL',
+    nn.UpsamplingBilinear2d: 'UPSMPL',
+    nn.UpsamplingNearest2d: 'UPSMPL',
+}
 
 def get_stdtype(module):
-    if isinstance(module, nn.Conv2d):
-        return 'CONV'
-    elif isinstance(module, nn.BatchNorm2d):
-        return 'BN'
-    elif isinstance(module, (nn.AvgPool2d, nn.MaxPool2d)):
-        return 'POOL'
-    elif isinstance(module, (nn.ReLU, nn.ReLU6, nn.PReLU, nn.ELU, nn.LeakyReLU)):
-        return 'ACT'
-    elif isinstance(module, nn.Upsample):
-        return 'UPSMPL'
-    elif isinstance(module, nn.Linear):
-        return 'FC'
-    elif isinstance(module, nn.Identity):
-        return 'IDT'
-    else:
-        return 'NONE'
+    typ = type(module)
+    if typ in _stdtype_map:
+        return _stdtype_map[typ]
+    if len(list(module.named_children()))==0:
+        sys.stderr.write('RASP: torch frontend: unrecognized module: {}\n'.format(str(typ)))
+    return 'NONE'
 
 def reg_stats_node(m, prefix=''):
     if hasattr(m, '_RASPStatNode'): return m._RASPStatNode
@@ -112,7 +142,7 @@ def reg_stats_node(m, prefix=''):
     node['params'] = get_num_params(m)
     h_in = m.register_forward_pre_hook(hook_module_in)
     h_out = m.register_forward_hook(hook_module_out)
-    node.tape = Tape(node=node, is_set=False)
+    node.tape = Tape(node=node)
     node.module = m
     node.hooks = [h_in, h_out]
     m._RASPStatNode = node
@@ -126,10 +156,13 @@ def reg_stats_node(m, prefix=''):
 def unreg_stats_node(m):
     if not hasattr(m, '_RASPStatNode'): return
     node = m._RASPStatNode
+    node.tape.clear()
+    del node.tape
     for h in node.hooks:
         h.remove()
     for sn, sm in m.named_children():
         unreg_stats_node(sm)
+    del m._RASPStatNode
 
 def hook_module_in(module, input):
     t0 = get_cpu_time()
@@ -138,7 +171,7 @@ def hook_module_in(module, input):
     tape.clear()
     tape.reg_parent('tape')
     if node['hook_comp']:
-        hook_compute_in(node, input[0].shape)
+        hook_compute_in(node, tuple(input[0].shape))
     if node['hook_time']:
         hook_time_start(node, t0)
 
@@ -147,7 +180,7 @@ def hook_module_out(module, input, output):
     node = module._RASPStatNode
     node['fwd'] = 1 + (node['fwd'] or 0)
     if node['hook_comp']:
-        hook_compute_out(node, input[0].shape, output.shape)
+        hook_compute_out(node, tuple(input[0].shape), tuple(output.shape))
     if node['hook_time']:
         hook_time_stop(node, t0)
 
@@ -209,11 +242,11 @@ def unhook_compute(module):
     for n, m in module.named_children():
         unhook_compute(m)
 
-def run(module, X):
+def run(module, inputs):
     with torch.no_grad():
-        return module(X)
+        return module(inputs)
 
-def pre_run(module, X):
+def pre_run(module, inputs):
     module.eval()
     return module
 

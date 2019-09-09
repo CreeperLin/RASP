@@ -23,18 +23,25 @@ class Dotdict(dict):
 
 default_conf = {
     'frontend':{
+        'type': 'pytorch'
     },
     'profile': {
-    },
-    'module': {
+        'batch_size': 1,
+        'num_batches': 5,
+        'warmup_batches': 5,
+        'timing_max_depth': -1,
+        'compute_max_depth': -1,
+        'verbose': False,
     },
     'device': {
+        'type': 'frontend',
     }, 
     'analysis': {
+        'regress_model': 'linear'
     }
 }
 
-global_config = Dotdict()
+global_config = Dotdict(default_conf)
 
 class Config():
     def __getattr__(self, k):
