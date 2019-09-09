@@ -85,10 +85,10 @@ def summary(df):
     return sum_str, total_df
 
 def summary_leaves(node, include_root=False, report_fields=None):
-    return summary(report(node.leaves(), include_root=include_root, report_fields=report_fields))
+    return summary(report(list(node.leaves()), include_root=include_root, report_fields=report_fields))
 
 def summary_all(node, include_root=False, report_fields=None):
-    return summary(report(node.subnodes(), include_root=include_root, report_fields=report_fields))
+    return summary(report(list(node.subnodes()), include_root=include_root, report_fields=report_fields))
 
 def summary_node(node, include_root=False, report_fields=None):
     return summary(report([node], include_root=include_root, report_fields=report_fields))
