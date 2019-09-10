@@ -53,8 +53,8 @@ def main():
         }
     })
 
-    print("%s | %s | %s" % ("Model", "Params", "FLOPs"))
-    print("---|---|---")
+    print("%s | %s | %s | %s" % ("Model", "Params", "MAdds", "FLOPs"))
+    print("---|---|---|---")
 
     fields = ['name', 'type', 'in_shape', 'out_shape',
             'params', 'madds', 'net_lat', 'lat[%]', 'flops', 'mem_rw']
@@ -70,8 +70,9 @@ def main():
         if args.verbose: print(summary)
         _, total_f = rasp.summary_node(stats, report_fields=fields)
         rasp.profile_off(model)
-        total_ops, total_params = total_f['flops'], total_f['params']
-        print("%s | %s | %s" % (name, rasp.round_value(total_params), rasp.round_value(total_ops)))
+        total_flops, total_madds, total_params = total_f['flops'], total_f['madds'], total_f['params']
+        print("%s | %s | %s | %s" % (name, rasp.round_value(total_params),
+             rasp.round_value(total_madds), rasp.round_value(total_flops)))
 
 if __name__ == '__main__':
     main()

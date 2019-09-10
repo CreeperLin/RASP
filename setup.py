@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-import os, sys
-import datetime
+import os
 
 from setuptools import setup, find_packages
 
@@ -10,7 +9,7 @@ readme = open(os.path.join(root_dir, 'README.md')).read()
 
 requirements = [name.rstrip() for name in open(os.path.join(root_dir, 'requirements.txt')).readlines()]
 
-VERSION = '0.0.1' + "_" + datetime.datetime.now().strftime('%Y%m%d%H%M')[2:]
+VERSION = '0.0.1'
 
 setup(
     name = 'rasp',
@@ -21,7 +20,7 @@ setup(
     description = 'Runtime Analyzer and Statistical Profiler for NN',
     long_description = readme,
     long_description_content_type = 'text/markdown',
-    license = 'MIT',
+    license = license,
     packages = find_packages(exclude=('test')),
     install_requires = requirements,
     classifiers = [

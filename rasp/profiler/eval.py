@@ -31,16 +31,10 @@ def eval_conv(node):
     
     kernel_numel = np.prod(kernel_size)
     bias_ops = 1 if bias else 0
-    kernel_mul = kernel_numel * (in_c // groups)
-    kernel_add = kernel_mul - 1 + bias_ops
-    kernel_mul_group = kernel_mul * out_feat * (out_c // groups)
-    kernel_add_group = kernel_add * out_feat * (out_c // groups)
-    total_mul = kernel_mul_group * groups
-    total_add = kernel_add_group * groups
-    madds = total_mul + total_add
-
     kernel_ops = kernel_numel
-    flops = bs * out_numel * (in_c // groups * kernel_ops + bias_ops)
+
+    madds = out_numel * (in_c // groups * kernel_ops + bias_ops)
+    flops = bs * out_numel * (2 * in_c // groups * kernel_ops - 1 + bias_ops)
 
     mem_r = bs * (out_numel + params)
     mem_w = bs * out_numel
@@ -58,13 +52,13 @@ def eval_bn(node):
     running_stats = node['running_stats']
     in_shape = node['in_shape']
     num_feat = node['num_feat']
-    bs, in_c, in_h, in_w = in_shape
-    in_numel = in_c * in_h * in_w
+    bs = in_shape[0]
+    in_numel = np.prod(in_shape[1:])
     
-    madds = 4 * in_numel
+    affine_ops = 1 if affine else 0
+    madds = (affine_ops + 3) * in_numel
 
-    flops = bs * in_numel
-    if affine: flops *= 2
+    flops = bs * madds
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * in_numel
@@ -97,13 +91,14 @@ def eval_pool(node):
 
     kernel_mul = 1 if ptype == 'avg' else 0
     kernel_add = kernel_numel - 1
+    kernel_ops = kernel_mul + kernel_add
 
     bs = out_shape[0]
     out_numel = np.prod(out_shape[1:])
     
-    madds = (kernel_mul+kernel_add) * out_numel
+    madds = kernel_ops * out_numel
 
-    flops = kernel_numel * bs * out_numel
+    flops = bs * 2 * madds
 
     mem_r = bs * (out_numel + params)
     mem_w = bs * out_numel
