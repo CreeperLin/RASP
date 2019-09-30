@@ -63,11 +63,14 @@ def hook_compute_out(node, in_shape, out_shape):
         node['flops'] = 0
         node['mem_r'] = 0
         node['mem_w'] = 0
+        last_n = None
         for n in tape.items:
+            if not last_n is None: last_n['dev_mem_delta'] = n['dev_mem'] - last_n['dev_mem']
             node['madds'] += n['madds']
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']
+            last_n = n
     DEV.add_node(node)
 
 def hook_time_start(node, t):

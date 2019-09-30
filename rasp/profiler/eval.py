@@ -26,10 +26,10 @@ def eval_conv(node):
     in_c = in_shape[1]
     bs = out_shape[0]
     out_c = out_shape[1]
-    out_feat = np.prod(out_shape[2:])
+    out_feat = int(np.prod(out_shape[2:]))
     out_numel = out_c * out_feat
     
-    kernel_numel = np.prod(kernel_size)
+    kernel_numel = int(np.prod(kernel_size))
     bias_ops = 1 if bias else 0
     kernel_ops = kernel_numel
 
@@ -53,7 +53,7 @@ def eval_bn(node):
     in_shape = node['in_shape']
     num_feat = node['num_feat']
     bs = in_shape[0]
-    in_numel = np.prod(in_shape[1:])
+    in_numel = int(np.prod(in_shape[1:]))
     
     affine_ops = 1 if affine else 0
     madds = (affine_ops + 3) * in_numel
@@ -87,14 +87,14 @@ def eval_pool(node):
         k = node['kernel_size']
         s = node['stride']
         p = node['padding']
-    kernel_numel = np.prod(k)
+    kernel_numel = int(np.prod(k))
 
     kernel_mul = 1 if ptype == 'avg' else 0
     kernel_add = kernel_numel - 1
     kernel_ops = kernel_mul + kernel_add
 
     bs = out_shape[0]
-    out_numel = np.prod(out_shape[1:])
+    out_numel = int(np.prod(out_shape[1:]))
     
     madds = kernel_ops * out_numel
 
@@ -116,7 +116,7 @@ def eval_act(node):
     out_shape = node['out_shape']
     bs = out_shape[0]
     num_feat = out_shape[1:]
-    out_numel = np.prod(num_feat)
+    out_numel = int(np.prod(num_feat))
 
     madds = out_numel
     flops = mem_r = mem_w = bs * out_numel 
@@ -138,7 +138,7 @@ def eval_upsample(node):
 
     bs = out_shape[0:]
     out_feat = out_shape[1:]
-    out_numel = np.prod(out_feat)
+    out_numel = int(np.prod(out_feat))
 
     if mode == "nearest":
         flops = 0

@@ -35,8 +35,7 @@ def load_device(config):
                 raise ValueError('Device missing required entry : ' + e)
         namespace = globals()
         for k, v in entries.items():
-            if k not in namespace:
-                namespace[k] = v
+            namespace[k] = v
         sys.stderr.write('RASP: using ' + _DEVICE + ' device\n')
     except ImportError as e:
         raise ValueError('Unable to import device : {} {}'.format(_DEVICE, str(e)))

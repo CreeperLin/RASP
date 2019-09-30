@@ -40,8 +40,7 @@ def load_frontend(config):
                 raise ValueError('frontend missing required entry :' + e)
         namespace = globals()
         for k, v in entries.items():
-            if k not in namespace:
-                namespace[k] = v
+            namespace[k] = v
         sys.stderr.write('RASP: using ' + _FRONTEND + ' frontend\n')
     except ImportError as e:
         raise ValueError('Unable to import frontend : {} {}'.format(_FRONTEND, str(e)))

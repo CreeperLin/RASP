@@ -57,7 +57,7 @@ def main():
     print("---|---|---|---")
 
     fields = ['name', 'type', 'in_shape', 'out_shape',
-            'params', 'madds', 'net_lat', 'lat[%]', 'flops', 'mem_rw']
+            'params', 'madds', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
     input_shape = (1, 3, 224, 224)
     inputs = torch.randn(input_shape, device=device)

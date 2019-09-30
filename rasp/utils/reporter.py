@@ -18,13 +18,14 @@ def round_value(value, binary=False, prec=2):
         return str(round(value / divisor**2, prec)) + 'M'
     elif value // divisor > 0:
         return str(round(value / divisor, prec)) + 'K'
-    return str(value)
+    return str(round(value, prec))
 
 
 def report(collected_nodes, include_root=False, report_fields=None):
     if len(collected_nodes)==0: return None
-    all_fields = ['name', 'type', 'in_shape', 'out_shape',
-            'params', 'madds', 'lat', 'net_lat', 'lat[%]', 'flops', 'mem_r', 'mem_w', 'mem_rw']
+    all_fields = ['name', 'type', 'in_shape', 'out_shape', 'params', 'madds',
+            'lat', 'net_lat', 'lat[%]', 'flops', 'mem_r', 'mem_w', 'mem_rw',
+            'dev_mem_alloc', 'dev_mem_delta']
     if report_fields is None: report_fields = all_fields
     if include_root:
         root = collected_nodes[0].root
@@ -53,32 +54,34 @@ def report(collected_nodes, include_root=False, report_fields=None):
     return df
 
 def summary(df):
-    total_params = df['params'].sum()
-    total_madds = df['madds'].sum()
-    total_flops = df['flops'].sum()
-    total_memrw = df['mem_rw'].sum()
-    df['lat[%]'] = 100 * df['net_lat'] / (df['net_lat'].sum() + 1e-16)
-    total_latency_ratio = df['lat[%]'].sum()
-    total_net_latency = df['net_lat'].sum()
+    if df is None: return '', None
+    df_fields = df.columns
+    rep_fields = list(df_fields)
+    if 'lat[%]' in df_fields and 'net_lat' in df_fields:
+        df['lat[%]'] = 100 * df['net_lat'] / (df['net_lat'].sum() + 1e-16)
+    agg_fields = ['name']
+    agg_val = ['']
+    for f in rep_fields:
+        try:
+            if f in ['name', 'type', 'in_shape', 'out_shape']: continue
+            tot_val = df[f].sum()
+            agg_val.append(tot_val)
+            agg_fields.append(f)
+        except:
+            continue
 
-    # Add Total row
-    total_df = pd.Series(['', total_params,
-                    total_madds, total_flops,
-                    total_latency_ratio, total_net_latency, total_memrw],
-                    index=['name', 'params', 'madds', 'flops', 'lat[%]', 'net_lat', 'mem_rw'],
-                    name='total')
+    total_df = pd.Series(agg_val, index=agg_fields, name='total')
     df = df.append(total_df)
 
     sum_str = str(df) + '\n'
     sum_str += "=" * len(str(df).split('\n')[0])
     sum_str += '\n'
-    sum_str += "Total params: {:,}\n".format(total_params)
-    sum_str += "-" * len(str(df).split('\n')[0])
-    sum_str += '\n'
-    sum_str += "Total MAdd: {} MAdds\n".format(round_value(total_madds))
-    sum_str += "Total FLOPs: {} FLOPs\n".format(round_value(total_flops))
-    sum_str += "Total Mem(R+W): {}B\n".format(round_value(total_memrw, True))
-    sum_str += "Total Latency: {:.5f} ms\n".format(total_net_latency)
+    for f, v in zip(agg_fields, agg_val):
+        if f in ['name', 'type', 'in_shape', 'out_shape', 'lat[%]']: continue
+        binary = False
+        if f in ['mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']:
+            binary = True
+        sum_str += "Total {}: {}\n".format(f, round_value(v, binary, prec=2))
     return sum_str, total_df
 
 def summary_leaves(node, include_root=False, report_fields=None):

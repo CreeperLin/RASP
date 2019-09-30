@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from rasp.utils.config import Dotdict
 import rasp.frontend as F
 
 def build_stats_tree(module):
@@ -31,8 +30,8 @@ def _addindent(s_, numSpaces):
 class StatTreeNode():
     def __init__(self, name):
         self.name = name
-        self._children = {}
-        self.stats = Dotdict()
+        self._children = dict()
+        self.stats = dict()
         self.parent = None
     
     def __setitem__(self, k, v):
@@ -44,13 +43,7 @@ class StatTreeNode():
 
     def update_values(self, dct):
         for key, value in dct.items():
-            if hasattr(value, 'keys'):
-                value = Dotdict(value)
             self.stats[key] = value
-    
-    def agg_values(self, dct):
-        for key, value in dct.items():
-            self.stats[key] += value
     
     def find_child_index(self, child_name):
         assert isinstance(child_name, str)

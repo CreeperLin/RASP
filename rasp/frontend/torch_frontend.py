@@ -14,6 +14,9 @@ def get_num_params(module):
 def get_dtype(module):
     pass
 
+def get_current_mem():
+    return torch.cuda.memory_allocated()
+
 def reg_conv(m):
     return {
         'C_in': m.in_channels,
@@ -167,6 +170,7 @@ def unreg_stats_node(m):
 def hook_module_in(module, input):
     t0 = get_cpu_time()
     node = module._RASPStatNode
+    node['dev_mem'] = get_current_mem()
     tape = node.tape
     tape.clear()
     tape.reg_parent('tape')
@@ -178,6 +182,7 @@ def hook_module_in(module, input):
 def hook_module_out(module, input, output):
     t0 = get_cpu_time()
     node = module._RASPStatNode
+    node['dev_mem_alloc'] = get_current_mem() - node['dev_mem']
     node['fwd'] = 1 + (node['fwd'] or 0)
     if node['hook_comp']:
         hook_compute_out(node, tuple(input[0].shape), tuple(output.shape))

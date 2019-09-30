@@ -46,7 +46,7 @@ def profile_batch(module, inputs):
         F.run(module, inputs)
         if i < warmup_batches: continue
         timer.rec(include=True)
-    print(timer.stat())
+    # print(timer.stat())
     return timer.mean()
 
 def profile_timing_once(module, input_shape=None, inputs=None):
@@ -93,3 +93,36 @@ def profile_on(module):
 def profile_off(module):
     unhook_all(module)
     destroy_stats_tree(module)
+
+class profile_timing():
+    def __init__(self, module):
+        self.module = module
+    
+    def __enter__(self, module):
+        self.stats_tree = profile_timing_on(self.module)
+        return self.stats_tree
+    
+    def __exit__(self):
+        profile_off(self.module)
+
+class profile_compute():
+    def __init__(self, module):
+        self.module = module
+    
+    def __enter__(self, module):
+        self.stats_tree = profile_compute_on(self.module)
+        return self.stats_tree
+    
+    def __exit__(self):
+        profile_off(self.module)
+
+class profile_all():
+    def __init__(self, module):
+        self.module = module
+    
+    def __enter__(self, module):
+        self.stats_tree = profile_on(self.module)
+        return self.stats_tree
+    
+    def __exit__(self):
+        profile_off(self.module)

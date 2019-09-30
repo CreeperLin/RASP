@@ -52,7 +52,7 @@ def get_regress_model(model_desc):
     if model_desc in model_creator:
         model = model_creator[model_desc]()
     else:
-        raise ValueError('unsupported model')
+        raise ValueError('unsupported model: {}'.format(model_desc))
     return model
 
 from sklearn.preprocessing import OneHotEncoder

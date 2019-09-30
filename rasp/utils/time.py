@@ -10,7 +10,7 @@ def get_time():
 
 class Timer():
     def __init__(self, time_src, synch=None, store=True):
-        self.time_src = time_src or get_cpu_time()
+        self.time_src = time_src or get_cpu_time
         self.record = np.array([])
         self.synch = synch or (lambda: None)
         self.store = store
