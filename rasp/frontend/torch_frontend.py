@@ -17,6 +17,9 @@ def get_dtype(module):
 def get_current_mem():
     return torch.cuda.memory_allocated()
 
+def synchronize():
+    torch.cuda.synchronize()
+
 def reg_conv(m):
     return {
         'C_in': m.in_channels,
@@ -217,8 +220,8 @@ def hook_timing(module, max_depth=-1):
     if max_depth == 0: return
     node = module._RASPStatNode
     if node['hook_time']: return
-    node['timer'] = Timer(time_src=get_cpu_time)
-    node['net_timer'] = Timer(time_src=get_cpu_time)
+    node['timer'] = Timer(time_src=get_cpu_time, synch=synchronize)
+    node['net_timer'] = Timer(time_src=get_cpu_time, synch=synchronize)
     node['hook_time'] = True
     for n, m in module.named_children():
         hook_timing(m, max_depth-1)

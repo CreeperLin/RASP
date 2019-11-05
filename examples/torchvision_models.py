@@ -5,7 +5,7 @@ import argparse
 import rasp
 
 model_names = sorted(name for name in models.__dict__ if
-                     name.islower() and not name.startswith("__") and not "inception" in name
+                     name.islower() and not name.startswith('__') and not 'inception' in name
                      and callable(models.__dict__[name]))
 
 def get_device(devdesc):
@@ -19,7 +19,7 @@ def get_device(devdesc):
         device = torch.device('cpu')
         return device, dev
     # set default gpu device id
-    device = torch.device("cuda")
+    device = torch.device('cuda')
     torch.cuda.set_device(dev[0])
     torch.cuda.manual_seed_all(1)
     torch.backends.cudnn.benchmark = False
@@ -27,9 +27,9 @@ def get_device(devdesc):
 
 def main():
     parser = argparse.ArgumentParser(description='profile torchvision models')
-    parser.add_argument('-d','--device',type=str,default="all", help="device ids")
-    parser.add_argument('-v','--verbose',action='store_true', help="verbose msg")
-    parser.add_argument('-t','--timing',action='store_true', help="enable timing")
+    parser.add_argument('-d','--device',type=str,default='all', help='device ids')
+    parser.add_argument('-v','--verbose',action='store_true', help='verbose msg')
+    parser.add_argument('-t','--timing',action='store_true', help='enable timing')
     args = parser.parse_args()
 
     device, devlist = get_device(args.device)
@@ -53,13 +53,13 @@ def main():
         }
     })
 
-    print("%s | %s | %s | %s" % ("Model", "Params", "MAdds", "FLOPs"))
-    print("---|---|---|---")
+    print('%s | %s | %s | %s | %s' % ('Model', 'Params', 'MAdds', 'FLOPs', 'latency'))
+    print('---|---|---|---|---')
 
     fields = ['name', 'type', 'in_shape', 'out_shape',
-            'params', 'madds', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
+            'params', 'madds', 'lat', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
-    input_shape = (1, 3, 224, 224)
+    input_shape = (8, 3, 224, 224)
     inputs = torch.randn(input_shape, device=device)
     
     for i, name in enumerate(model_names):
@@ -68,11 +68,11 @@ def main():
         if args.timing: stats = rasp.profile_timing_once(model, inputs=inputs)
         summary, _ = rasp.summary_tape(stats, report_fields=fields)
         if args.verbose: print(summary)
-        _, total_f = rasp.summary_node(stats, report_fields=fields)
+        _, f = rasp.summary_node(stats, report_fields=fields)
         rasp.profile_off(model)
-        total_flops, total_madds, total_params = total_f['flops'], total_f['madds'], total_f['params']
-        print("%s | %s | %s | %s" % (name, rasp.round_value(total_params),
-             rasp.round_value(total_madds), rasp.round_value(total_flops)))
+        flops, madds, params, latency = f['flops'], f['madds'], f['params'], f['lat']
+        print('%s | %s | %s | %s | %s' % (name, rasp.round_value(params),
+             rasp.round_value(madds), rasp.round_value(flops), rasp.round_value(latency)))
 
 if __name__ == '__main__':
     main()

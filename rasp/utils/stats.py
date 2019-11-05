@@ -35,7 +35,7 @@ def get_batch_data(input_shape):
 def profile_batch(module, inputs):
     num_batches = CFG.profile.num_batches
     warmup_batches = CFG.profile.warmup_batches
-    timer = Timer(time_src=get_cpu_time)
+    timer = Timer(time_src=get_cpu_time, synch=F.synchronize)
     F.pre_run(module, inputs)
     tot_batches = num_batches + warmup_batches
     verbose = CFG.profile.verbose
