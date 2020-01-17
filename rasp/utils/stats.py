@@ -1,36 +1,79 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from rasp.profiler.hook import hook_compute, unhook_compute, hook_timing, unhook_timing, hook_all, unhook_all
-from rasp.profiler.tree import build_stats_tree, destroy_stats_tree, reset_timing_all
-from rasp.utils.config import CFG
-from rasp.utils.time import Timer, get_cpu_time
-from rasp.utils.reporter import report, save_report, summary
-import rasp.frontend as F
+from ..profiler.tree import reset_timing_all
+from ..utils.config import CFG
+from ..utils.time import Timer, get_cpu_time
+from ..utils.reporter import report, save_report, summary
+from .. import frontend as F
+
+
+def build_stats_tree(module):
+    stats_tree = F.reg_stats_node(module)
+    return stats_tree
+
+
+def destroy_stats_tree(module):
+    F.unreg_stats_node(module)
+
+
+def hook_all(module):
+    hook_compute(module)
+    hook_timing(module)
+
+
+def unhook_all(module):
+    unhook_compute(module)
+    unhook_timing(module)
+
+
+def hook_timing(module):
+    max_depth = CFG.profile.compute_max_depth
+    F.hook_timing(module, max_depth)
+
+
+def unhook_timing(module):
+    F.unhook_timing(module)
+
+
+def hook_compute(module):
+    max_depth = CFG.profile.compute_max_depth
+    F.hook_compute(module, max_depth)
+
+
+def unhook_compute(module):
+    F.unhook_compute(module)
+
 
 def reset_stat(node):
     reset_timing_all(node)
 
-def stat(module, input_shape, disp_fields=None):
+
+def stat(module, input_shape, compute=True, timing=False, 
+         disp_fields=None, report=False, save_report=False):
     disp_fields = disp_fields or ['name', 'params', 'madds', 'lat', 'net_lat', 'flops', 'mem_r', 'mem_w', 'mem_rw']
     stats_tree = build_stats_tree(module)
-    profile_compute_once(module, input_shape)
-    profile_timing_once(module, input_shape)
-    
-    leaves_report = report(list(stats_tree.subnodes()), report_fields=disp_fields, include_root=False)
-    # leaves_report = report(list(stats_tree.leaves()), report_fields=disp_fields)
-    root_report = report([stats_tree], report_fields=disp_fields, include_root=False)
-    print(summary(leaves_report))
-    print(summary(root_report))
-    
-    savepath = CFG.profile.report_savepath
-    save_report(leaves_report, savepath, 'leaves_report.csv')
+    if compute:
+        profile_compute_once(module, input_shape)
+    if timing:
+        profile_timing_once(module, input_shape)
+    if report:
+        leaves_report = report(list(stats_tree.subnodes()), report_fields=disp_fields, include_root=False)
+        # leaves_report = report(list(stats_tree.leaves()), report_fields=disp_fields)
+        root_report = report([stats_tree], report_fields=disp_fields, include_root=False)
+        print(summary(leaves_report))
+        print(summary(root_report))
+        if save_report:
+            savepath = CFG.profile.report_savepath
+            save_report(leaves_report, savepath, 'leaves_report.csv')
     return stats_tree
+
 
 def get_batch_data(input_shape):
     batch_size = CFG.profile.batch_size
     data_size = (batch_size, ) + input_shape
     inputs = F.get_random_data(data_size)
     return inputs
+
 
 def profile_batch(module, inputs):
     num_batches = CFG.profile.num_batches
@@ -49,6 +92,7 @@ def profile_batch(module, inputs):
     # print(timer.stat())
     return timer.mean()
 
+
 def profile_timing_once(module, input_shape=None, inputs=None):
     inputs = get_batch_data(input_shape) if inputs is None else inputs
     # timing w/o hook
@@ -59,6 +103,7 @@ def profile_timing_once(module, input_shape=None, inputs=None):
     profile_timing_off(module)
     return stats_tree
 
+
 def profile_compute_once(module, input_shape=None, inputs=None):
     stats_tree = profile_compute_on(module)
     inputs = get_batch_data(input_shape) if inputs is None else inputs
@@ -67,14 +112,17 @@ def profile_compute_once(module, input_shape=None, inputs=None):
     profile_compute_off(module)
     return stats_tree
 
+
 def profile_compute_on(module):
     stats_tree = build_stats_tree(module)
     hook_compute(module)
     reset_stat(stats_tree)
     return stats_tree
 
+
 def profile_compute_off(module):
     unhook_compute(module)
+
 
 def profile_timing_on(module):
     stats_tree = build_stats_tree(module)
@@ -82,13 +130,16 @@ def profile_timing_on(module):
     reset_stat(stats_tree)
     return stats_tree
 
+
 def profile_timing_off(module):
     unhook_timing(module)
+
 
 def profile_on(module):
     stats_tree = build_stats_tree(module)
     hook_all(module)
     return stats_tree
+
 
 def profile_off(module):
     unhook_all(module)
@@ -104,6 +155,7 @@ class profile_timing():
     
     def __exit__(self):
         profile_off(self.module)
+
 
 class profile_compute():
     def __init__(self, module):

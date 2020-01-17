@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from rasp.device import load_device
-from rasp.frontend import load_frontend
+from ..device import load_device
+from ..frontend import load_frontend
 
 class Dotdict(dict):
     """
@@ -41,8 +41,6 @@ default_conf = {
     }
 }
 
-global_config = Dotdict(default_conf)
-
 class Config():
     def __getattr__(self, k):
         global global_config
@@ -74,3 +72,7 @@ def set_config(conf):
 def get_config():
     global global_config
     return global_config
+
+
+global_config = None
+set_default_config()

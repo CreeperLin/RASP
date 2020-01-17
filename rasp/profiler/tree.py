@@ -1,12 +1,4 @@
 # -*- coding: utf-8 -*-
-import rasp.frontend as F
-
-def build_stats_tree(module):
-    stats_tree = F.reg_stats_node(module)
-    return stats_tree
-
-def destroy_stats_tree(module):
-    F.unreg_stats_node(module)
 
 def reset_timing_all(node):
     if not node['timer'] is None:

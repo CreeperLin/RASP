@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import torch
 import torch.nn as nn
+import psutil
 from torch.utils.data import TensorDataset, DataLoader
-from rasp.profiler.tree import StatTreeNode
-from rasp.profiler.hook import Tape, hook_compute_in, hook_compute_out,\
+from ..profiler.tree import StatTreeNode
+from ..profiler.hook import Tape, hook_compute_in, hook_compute_out,\
                                hook_time_start, hook_time_stop
-from rasp.utils.time import Timer, get_cpu_time, get_time
+from ..utils.time import Timer, get_cpu_time, get_time
+
+base_mem = None
 
 def get_num_params(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
@@ -14,11 +18,28 @@ def get_num_params(module):
 def get_dtype(module):
     pass
 
+def get_device(module):
+    p_list = list(module.parameters())
+    if len(p_list) == 0: return None
+    return p_list[0].device
+
 def get_current_mem():
-    return torch.cuda.memory_allocated()
+    if torch.cuda.is_available():
+        gpu_mem = torch.cuda.memory_allocated()
+        if torch.cuda.max_memory_allocated() != 0: return gpu_mem
+    # cpu
+    return psutil.Process(os.getpid()).memory_info().rss
+
+def get_max_mem():
+    if torch.cuda.is_available():
+        max_mem = torch.cuda.max_memory_allocated()
+        if max_mem != 0: return max_mem
+    # return max_mem
+    return get_current_mem()
 
 def synchronize():
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
 
 def reg_conv(m):
     return {
@@ -139,30 +160,35 @@ def get_stdtype(module):
         sys.stderr.write('RASP: torch frontend: unrecognized module: {}\n'.format(str(typ)))
     return 'NONE'
 
-def reg_stats_node(m, prefix=''):
-    if hasattr(m, '_RASPStatNode'): return m._RASPStatNode
+def get_stats_node(m, prefix='', hook=True, tape=True):
     node = StatTreeNode(prefix)
+    node.module = m
     node['type'] = type(m).__name__
     node['stdtype'] = get_stdtype(m)
     node['name'] = prefix
     node['params'] = get_num_params(m)
-    h_in = m.register_forward_pre_hook(hook_module_in)
-    h_out = m.register_forward_hook(hook_module_out)
-    node.tape = Tape(node=node)
-    node.module = m
-    node.hooks = [h_in, h_out]
+    node.tape = Tape(node=node) if tape else None
+    node.hooks = []
+    if hook:
+        h_in = m.register_forward_pre_hook(hook_module_in)
+        h_out = m.register_forward_hook(hook_module_out)
+        node.hooks = [h_in, h_out]
+    return node
+
+def reg_stats_node(m, prefix='', hook=True, tape=True):
+    if hasattr(m, '_RASPStatNode'): return m._RASPStatNode
+    node = get_stats_node(m, prefix, hook, tape)
     m._RASPStatNode = node
-    if len(list(m.named_children()))==0:
-        reg_stat(node, m)
-    else:
-        for sn, sm in m.named_children():
-            node.add_child(sn, reg_stats_node(sm, prefix+'.'+sn))
+    reg_stat(node, m)
+    for sn, sm in m.named_children():
+        node.add_child(sn, reg_stats_node(sm, prefix+'.'+sn))
     return node
 
 def unreg_stats_node(m):
     if not hasattr(m, '_RASPStatNode'): return
     node = m._RASPStatNode
-    node.tape.clear()
+    if not node.tape is None:
+        node.tape.clear()
     del node.tape
     for h in node.hooks:
         h.remove()
@@ -173,10 +199,14 @@ def unreg_stats_node(m):
 def hook_module_in(module, input):
     t0 = get_cpu_time()
     node = module._RASPStatNode
-    node['dev_mem'] = get_current_mem()
+    if node['stat_mem']:
+        torch.cuda.reset_max_memory_allocated()
+        node['dev_mem'] = get_current_mem()
+        node['net_dev_mem'] = node['dev_mem'] - base_mem
     tape = node.tape
-    tape.clear()
-    tape.reg_parent('tape')
+    if not tape is None:
+        tape.clear()
+        tape.reg_parent('tape')
     if node['hook_comp']:
         hook_compute_in(node, tuple(input[0].shape))
     if node['hook_time']:
@@ -185,7 +215,10 @@ def hook_module_in(module, input):
 def hook_module_out(module, input, output):
     t0 = get_cpu_time()
     node = module._RASPStatNode
-    node['dev_mem_alloc'] = get_current_mem() - node['dev_mem']
+    if node['stat_mem']:
+        node['dev_mem_alloc'] = get_current_mem() - node['dev_mem']
+        node['dev_max_mem'] = get_max_mem()
+        node['dev_max_mem_alloc'] = node['dev_max_mem'] - base_mem
     node['fwd'] = 1 + (node['fwd'] or 0)
     if node['hook_comp']:
         hook_compute_out(node, tuple(input[0].shape), tuple(output.shape))
@@ -251,6 +284,8 @@ def unhook_compute(module):
         unhook_compute(m)
 
 def run(module, inputs):
+    global base_mem
+    base_mem = get_current_mem() if base_mem is None else base_mem
     with torch.no_grad():
         return module(inputs)
 
@@ -259,5 +294,7 @@ def pre_run(module, inputs):
     return module
 
 def get_random_data(data_size):
+    global base_mem
+    base_mem = get_current_mem()
     data = torch.rand(data_size)
     return data

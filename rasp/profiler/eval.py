@@ -13,20 +13,20 @@ def numel_to_bytes(numel, prec='float'):
     return int(byte)
 
 def eval_conv(node):
-    C_in = node['C_in']
-    C_out = node['C_out']
+    in_c = node['C_in']
+    out_c = node['C_out']
     params = node['params']
     kernel_size = node['kernel_size']
-    s = node['stride']
-    p = node['padding']
+    sh, sw = node['stride']
+    ph, pw = node['padding']
     bias = node['bias']
     groups = node['groups']
     in_shape = node['in_shape']
     out_shape = node['out_shape']
-    in_c = in_shape[1]
-    bs = out_shape[0]
-    out_c = out_shape[1]
-    out_feat = int(np.prod(out_shape[2:]))
+    bs, _, ih, iw = in_shape
+    kh, kw = kernel_size[:2]
+    oh, ow = (ih + 2 * ph - kh) / sh + 1, (iw + 2 * pw - kw) / sw + 1
+    out_feat = oh * ow
     out_numel = out_c * out_feat
     
     kernel_numel = int(np.prod(kernel_size))
@@ -113,13 +113,12 @@ def eval_pool(node):
 def eval_act(node):
     params = node['params']
     in_shape = node['in_shape']
-    out_shape = node['out_shape']
-    bs = out_shape[0]
-    num_feat = out_shape[1:]
-    out_numel = int(np.prod(num_feat))
+    bs = in_shape[0]
+    num_feat = in_shape[1:]
+    in_numel = int(np.prod(num_feat))
 
-    madds = out_numel
-    flops = mem_r = mem_w = bs * out_numel 
+    madds = in_numel
+    flops = mem_r = mem_w = bs * in_numel 
 
     return {
         'madds': int(madds),
@@ -173,7 +172,6 @@ def eval_linear(node):
     params = node['params']
     bias = node['bias']
     in_shape = node['in_shape']
-    out_shape = node['out_shape']
     bs = in_shape[0]
     
     bias_ops = 1 if bias else 0
@@ -208,8 +206,9 @@ def eval_nullop(node):
     }
 
 
-def eval_compute_prop(node):
-    if node['updated']: return
+def eval_compute_prop(node, mark_updated=True):
+    if node['compute_updated']: return
+    assert not node['in_shape'] is None
     stdtype = node['stdtype']
     if stdtype == 'CONV':
         m_stats = eval_conv(node)
@@ -229,4 +228,26 @@ def eval_compute_prop(node):
         # print(f"compute {stdtype} is not supported!")
         m_stats = eval_nullop(node)
     node.update_values(m_stats)
-    node['updated'] = True
+    if mark_updated:
+        node['compute_updated'] = True
+
+
+def eval_compute_nofwd(node, in_shape=None, out_shape=None):
+    out_shape = in_shape if out_shape is None else out_shape
+    node['in_shape'] = in_shape
+    node['out_shape'] = out_shape
+    if node.num_children == 0:
+        eval_compute_prop(node, False)
+    else:
+        node['madds'] = 0
+        node['flops'] = 0
+        node['mem_r'] = 0
+        node['mem_w'] = 0
+        n_in, n_out = in_shape, out_shape
+        for n in node.children:
+            eval_compute_nofwd(n, n_in, n_out)
+            # n_in, n_out = n_out
+            node['madds'] += n['madds']
+            node['flops'] += n['flops']
+            node['mem_r'] += n['mem_r']
+            node['mem_w'] += n['mem_w']

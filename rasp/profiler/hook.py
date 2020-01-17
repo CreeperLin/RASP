@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from .eval import eval_compute_prop
-import rasp.frontend as F
-from rasp.utils.config import CFG
-import rasp.device as DEV
+from .. import device as DEV
 
 class Tape():
     def __init__(self, node):
@@ -52,12 +50,13 @@ def hook_compute_in(node, in_shape):
     pass
 
 def hook_compute_out(node, in_shape, out_shape):
+    # if node['compute_updated']: return
     tape = node.tape
     node['in_shape'] = in_shape
     node['out_shape'] = out_shape
     if node.num_children==0:
         eval_compute_prop(node)
-    else:
+    elif not tape is None:
         # TODO custom layer measurement
         node['madds'] = 0
         node['flops'] = 0
@@ -65,12 +64,14 @@ def hook_compute_out(node, in_shape, out_shape):
         node['mem_w'] = 0
         last_n = None
         for n in tape.items:
-            if not last_n is None: last_n['dev_mem_delta'] = n['dev_mem'] - last_n['dev_mem']
+            if not last_n is None and not n['dev_mem'] is None:
+                last_n['dev_mem_delta'] = n['dev_mem'] - last_n['dev_mem']
             node['madds'] += n['madds']
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']
             last_n = n
+        node['compute_updated'] = True
     DEV.add_node(node)
 
 def hook_time_start(node, t):
@@ -93,25 +94,3 @@ def hook_time_stop(node, t):
     overhead = tot_lat - lat
     node['prof_overhead'] = overhead
     timer.rec(include=True)
-
-def hook_all(module):
-    hook_compute(module)
-    hook_timing(module)
-
-def unhook_all(module):
-    unhook_compute(module)
-    unhook_timing(module)
-
-def hook_timing(module):
-    max_depth = CFG.profile.compute_max_depth
-    F.hook_timing(module, max_depth)
-
-def unhook_timing(module):
-    F.unhook_timing(module)
-
-def hook_compute(module):
-    max_depth = CFG.profile.compute_max_depth
-    F.hook_compute(module, max_depth)
-
-def unhook_compute(module):
-    F.unhook_compute(module)

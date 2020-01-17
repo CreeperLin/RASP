@@ -3,7 +3,7 @@ import os
 import sys
 import numpy as np
 import sklearn
-from rasp.utils.config import CFG
+from ..utils.config import CFG
 
 def get_linear_model():
     from sklearn.linear_model import LinearRegression

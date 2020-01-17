@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from rasp.utils.reporter import generate_report
+from ..utils.reporter import generate_report
 
 class RegressorDevice():
     def __init__(self):

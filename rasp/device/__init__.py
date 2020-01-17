@@ -12,10 +12,7 @@ required_entries = [
 
 def load_device(config):
     global _DEVICE
-    try:
-        _DEVICE = config.device.type
-    except:
-        pass
+    _DEVICE = config.device.get('type', 'frontend')
     
     if _DEVICE == 'frontend':
         module_name = '.frontend_device'
@@ -36,7 +33,6 @@ def load_device(config):
         namespace = globals()
         for k, v in entries.items():
             namespace[k] = v
-        sys.stderr.write('RASP: using ' + _DEVICE + ' device\n')
     except ImportError as e:
         raise ValueError('Unable to import device : {} {}'.format(_DEVICE, str(e)))
 

@@ -2,8 +2,8 @@
 import sys
 import time
 import numpy as np
-import rasp.frontend as F
 from functools import wraps
+from .. import frontend as F
 
 def get_cputime():
     return time.perf_counter()
