@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 import os
-import sys
+import logging
 import torch
 import torch.nn as nn
-import psutil
-from torch.utils.data import TensorDataset, DataLoader
 from ..profiler.tree import StatTreeNode
 from ..profiler.hook import Tape, hook_compute_in, hook_compute_out,\
                                hook_time_start, hook_time_stop
 from ..utils.time import Timer, get_cpu_time, get_time
+from .. import device as DEV
 
-base_mem = None
+logger = logging.getLogger('rasp')
+
+def init():
+    pass
 
 def get_num_params(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
@@ -22,24 +24,6 @@ def get_device(module):
     p_list = list(module.parameters())
     if len(p_list) == 0: return None
     return p_list[0].device
-
-def get_current_mem():
-    if torch.cuda.is_available():
-        gpu_mem = torch.cuda.memory_allocated()
-        if torch.cuda.max_memory_allocated() != 0: return gpu_mem
-    # cpu
-    return psutil.Process(os.getpid()).memory_info().rss
-
-def get_max_mem():
-    if torch.cuda.is_available():
-        max_mem = torch.cuda.max_memory_allocated()
-        if max_mem != 0: return max_mem
-    # return max_mem
-    return get_current_mem()
-
-def synchronize():
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
 
 def reg_conv(m):
     return {
@@ -157,7 +141,7 @@ def get_stdtype(module):
     if typ in _stdtype_map:
         return _stdtype_map[typ]
     if len(list(module.named_children()))==0:
-        sys.stderr.write('RASP: torch frontend: unrecognized module: {}\n'.format(str(typ)))
+        logger.warning('torch frontend: unrecognized module: {}\n'.format(str(typ)))
     return 'NONE'
 
 def get_stats_node(m, prefix='', hook=True, tape=True):
@@ -200,9 +184,8 @@ def hook_module_in(module, input):
     t0 = get_cpu_time()
     node = module._RASPStatNode
     if node['stat_mem']:
-        torch.cuda.reset_max_memory_allocated()
-        node['dev_mem'] = get_current_mem()
-        node['net_dev_mem'] = node['dev_mem'] - base_mem
+        node['dev_mem'] = DEV.get_current_mem()
+        node['net_dev_mem'] = node['dev_mem'] - DEV.get_init_mem()
     tape = node.tape
     if not tape is None:
         tape.clear()
@@ -216,14 +199,15 @@ def hook_module_out(module, input, output):
     t0 = get_cpu_time()
     node = module._RASPStatNode
     if node['stat_mem']:
-        node['dev_mem_alloc'] = get_current_mem() - node['dev_mem']
-        node['dev_max_mem'] = get_max_mem()
-        node['dev_max_mem_alloc'] = node['dev_max_mem'] - base_mem
+        node['dev_mem_alloc'] = DEV.get_current_mem() - node['dev_mem']
+        node['dev_max_mem'] = DEV.get_max_mem()
+        node['dev_max_mem_alloc'] = node['dev_max_mem'] - DEV.get_init_mem()
     node['fwd'] = 1 + (node['fwd'] or 0)
     if node['hook_comp']:
         hook_compute_out(node, tuple(input[0].shape), tuple(output.shape))
     if node['hook_time']:
         hook_time_stop(node, t0)
+    DEV.add_node(node)
 
 _origin_call = dict()
 def wrap_call(module, *input, **kwargs):
@@ -253,8 +237,8 @@ def hook_timing(module, max_depth=-1):
     if max_depth == 0: return
     node = module._RASPStatNode
     if node['hook_time']: return
-    node['timer'] = Timer(time_src=get_cpu_time, synch=synchronize)
-    node['net_timer'] = Timer(time_src=get_cpu_time, synch=synchronize)
+    node['timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
+    node['net_timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
     node['hook_time'] = True
     for n, m in module.named_children():
         hook_timing(m, max_depth-1)
@@ -283,18 +267,43 @@ def unhook_compute(module):
     for n, m in module.named_children():
         unhook_compute(m)
 
-def run(module, inputs):
-    global base_mem
-    base_mem = get_current_mem() if base_mem is None else base_mem
-    with torch.no_grad():
-        return module(inputs)
-
-def pre_run(module, inputs):
-    module.eval()
-    return module
 
 def get_random_data(data_size):
-    global base_mem
-    base_mem = get_current_mem()
     data = torch.rand(data_size)
     return data
+
+
+class profile_ctx():
+    def __init__(self, module, inputs, device):
+        self.module = module
+        self.inputs = inputs
+        self.last_device = get_device(module)
+        self.device = self.last_device
+        self.module_training = module.training
+        if not device is None:
+            self.device = device
+    
+    def __enter__(self):
+        self.module.eval()
+        self.module.to(self.device)
+        self.inputs = self.inputs.to(self.device)
+        DEV.reset()
+        return self
+
+    def run(self):
+        with torch.no_grad():
+            return self.module(self.inputs)
+
+    def __exit__(self, type, value, trace):
+        if not self.last_device is None:
+            self.module.to(self.last_device)
+        self.module.train(self.module_training)
+
+
+def get_ctx(module, inputs, device):
+    return profile_ctx(module, inputs, device)
+
+
+def run(module, inputs, device):
+    with profile_ctx(module, inputs, device) as ctx:
+        ctx.run()

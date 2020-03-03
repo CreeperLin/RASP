@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from .eval import eval_compute_prop
-from .. import device as DEV
 
 class Tape():
     def __init__(self, node):
@@ -72,7 +71,6 @@ def hook_compute_out(node, in_shape, out_shape):
             node['mem_w'] += n['mem_w']
             last_n = n
         node['compute_updated'] = True
-    DEV.add_node(node)
 
 def hook_time_start(node, t):
     node['timer'].rec(t=t, include=False)

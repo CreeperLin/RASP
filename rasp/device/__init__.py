@@ -12,7 +12,7 @@ required_entries = [
 
 def load_device(config):
     global _DEVICE
-    _DEVICE = config.device.get('type', 'frontend')
+    _DEVICE = config.get('type', 'frontend')
     
     if _DEVICE == 'frontend':
         module_name = '.frontend_device'
@@ -22,7 +22,7 @@ def load_device(config):
         package = 'rasp.device'
     else:
         module_name = '.'+_DEVICE
-        package = config.device.package
+        package = config.get('package', '')
     # Try and load external device.
     try:
         device_module = importlib.import_module(module_name, package)

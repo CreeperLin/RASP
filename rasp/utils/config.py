@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from ..device import load_device
-from ..frontend import load_frontend
+from .. import device as DEV
+from .. import frontend as F
 
 class Dotdict(dict):
     """
@@ -23,7 +23,8 @@ class Dotdict(dict):
 
 default_conf = {
     'frontend':{
-        'type': 'pytorch'
+        'type': 'pytorch',
+        'args': {},
     },
     'profile': {
         'batch_size': 1,
@@ -35,6 +36,10 @@ default_conf = {
     },
     'device': {
         'type': 'frontend',
+        'args': {
+            'frontend': 'pytorch',
+            'device': None,
+        },
     }, 
     'analysis': {
         'regress_model': 'linear'
@@ -65,8 +70,10 @@ def set_default_config():
 def set_config(conf):
     global global_config
     global_config = Dotdict(conf)
-    load_frontend(global_config)
-    load_device(global_config)
+    F.load_frontend(global_config.frontend)
+    F.init(**global_config.frontend.args)
+    DEV.load_device(global_config.device)
+    DEV.init(**global_config.device.args)
     return CFG
 
 def get_config():

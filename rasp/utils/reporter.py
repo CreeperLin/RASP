@@ -97,13 +97,13 @@ def summary_node(node, include_root=False, report_fields=None):
     return summary(report([node], include_root=include_root, report_fields=report_fields))
 
 def summary_root(node, include_root=False, report_fields=None):
-    return summary(report([node.root()], include_root=include_root, report_fields=report_fields))
+    return summary(report([node.root], include_root=include_root, report_fields=report_fields))
 
 def load_report(path):
     df = pd.read_csv(path, converters={'name':str})
     return df
 
-def save_report(report, savepath, name):
-    out_dir = os.path.join('.', savepath)
-    os.makedirs(out_dir, exist_ok=True)
-    report.to_csv(os.path.join(out_dir, name), index=False)
+def save_report(report, savepath):
+    save_dir = os.path.split(savepath)[0]
+    os.makedirs(save_dir, exist_ok=True)
+    report.to_csv(savepath, index=False)

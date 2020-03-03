@@ -10,7 +10,6 @@ required_entries = [
     'hook_timing',
     'unhook_compute',
     'unhook_timing',
-    'pre_run',
     'run',
     'get_random_data',
 ]
@@ -18,7 +17,7 @@ required_entries = [
 def load_frontend(config):
     global _FRONTEND
     try:
-        _FRONTEND = config.frontend.type
+        _FRONTEND = config.type
     except:
         pass
 
@@ -30,7 +29,7 @@ def load_frontend(config):
         package = 'rasp.frontend'
     else:
         module_name = _FRONTEND
-        package = config.frontend.package
+        package = config.get('package', None)
     
     # try:
     frontend_module = importlib.import_module(module_name, package)
