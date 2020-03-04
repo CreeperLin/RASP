@@ -20,6 +20,15 @@ def get_num_params(module):
 def get_dtype(module):
     pass
 
+def get_data_shape(data):
+    if isinstance(data, (tuple, list)):
+        ret = [get_data_shape(d) for d in data]
+        if len(ret) == 1:
+            ret = ret[0]
+        return ret
+    elif isinstance(data, torch.Tensor):
+        return tuple(data.shape)
+
 def get_device(module):
     p_list = list(module.parameters())
     if len(p_list) == 0: return None
@@ -191,7 +200,7 @@ def hook_module_in(module, input):
         tape.clear()
         tape.reg_parent('tape')
     if node['hook_comp']:
-        hook_compute_in(node, tuple(input[0].shape))
+        hook_compute_in(node, get_data_shape(input))
     if node['hook_time']:
         hook_time_start(node, t0)
 
@@ -204,7 +213,7 @@ def hook_module_out(module, input, output):
         node['dev_max_mem_alloc'] = node['dev_max_mem'] - DEV.get_init_mem()
     node['fwd'] = 1 + (node['fwd'] or 0)
     if node['hook_comp']:
-        hook_compute_out(node, tuple(input[0].shape), tuple(output.shape))
+        hook_compute_out(node, get_data_shape(input), get_data_shape(output))
     if node['hook_time']:
         hook_time_stop(node, t0)
     DEV.add_node(node)
