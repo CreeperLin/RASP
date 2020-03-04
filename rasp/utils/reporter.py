@@ -7,6 +7,13 @@ pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 10000)
 pd.set_option('display.max_columns', 10000)
 
+def get_unit_name(field_name):
+    if 'mem' in field_name:
+        return 'Byte'
+    if 'lat' in field_name:
+        return 'MS'
+    return ''
+
 def round_value(value, binary=False, prec=2):
     divisor = 1024. if binary else 1000.
 
@@ -81,7 +88,7 @@ def summary(df):
         binary = False
         if f in ['mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']:
             binary = True
-        sum_str += "Total {}: {}\n".format(f, round_value(v, binary, prec=2))
+        sum_str += "Total {}: {} {}\n".format(f, round_value(v, binary, prec=2), get_unit_name(f))
     return sum_str, total_df
 
 def summary_leaves(node, include_root=False, report_fields=None):

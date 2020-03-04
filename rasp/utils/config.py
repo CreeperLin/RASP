@@ -28,8 +28,8 @@ default_conf = {
     },
     'profile': {
         'batch_size': 1,
-        'num_batches': 5,
-        'warmup_batches': 5,
+        'num_batches': 100,
+        'warmup_batches': 10,
         'timing_max_depth': -1,
         'compute_max_depth': -1,
         'verbose': False,

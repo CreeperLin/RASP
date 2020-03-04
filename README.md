@@ -30,6 +30,14 @@ Specify device
 rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True)
 ```
 
+Customize profiling parameters
+
+```python
+rasp.CFG.profile.num_batches=200
+rasp.CFG.profile.warmup_batches=20
+rasp.stat(model, input_shape=(1, 3, 224, 224), timing=True)
+```
+
 Use your own input
 
 ```python
