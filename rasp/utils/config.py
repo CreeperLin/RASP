@@ -69,11 +69,14 @@ def set_default_config():
 
 def set_config(conf):
     global global_config
-    global_config = Dotdict(conf)
+    if global_config is None:
+        global_config = Dotdict(conf)
+    else:
+        global_config.update(Dotdict(conf))
     F.load_frontend(global_config.frontend)
-    F.init(**global_config.frontend.args)
+    F.init(**global_config.frontend.get('args', {}))
     DEV.load_device(global_config.device)
-    DEV.init(**global_config.device.args)
+    DEV.init(**global_config.device.get('args', {}))
     return CFG
 
 def get_config():

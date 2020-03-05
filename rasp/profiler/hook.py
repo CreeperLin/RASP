@@ -54,10 +54,9 @@ def hook_compute_out(node, in_shape, out_shape):
     node['in_shape'] = in_shape
     node['out_shape'] = out_shape
     if node.num_children==0:
-        eval_compute_prop(node)
+        eval_compute_prop(node, True)
     elif not tape is None:
         # TODO custom layer measurement
-        node['madds'] = 0
         node['flops'] = 0
         node['mem_r'] = 0
         node['mem_w'] = 0
@@ -65,7 +64,6 @@ def hook_compute_out(node, in_shape, out_shape):
         for n in tape.items:
             if not last_n is None and not n['dev_mem'] is None:
                 last_n['dev_mem_delta'] = n['dev_mem'] - last_n['dev_mem']
-            node['madds'] += n['madds']
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']
@@ -79,7 +77,8 @@ def hook_time_start(node, t):
 def hook_time_stop(node, t):
     tape = node.tape
     net_timer = node['net_timer']
-    net_timer.rec(t=t, include=True)
+    # net_timer.rec(t=t, include=True)
+    net_timer.rec(include=True)
     net_lat = lat = net_timer.mean()
     for n in tape.items:
         lat -= n['prof_overhead']

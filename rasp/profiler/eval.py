@@ -33,14 +33,12 @@ def eval_conv(node):
     bias_ops = 1 if bias else 0
     kernel_ops = kernel_numel
 
-    madds = out_numel * (in_c // groups * kernel_ops + bias_ops)
-    flops = bs * out_numel * (2 * in_c // groups * kernel_ops - 1 + bias_ops)
+    flops = bs * out_numel * (in_c // groups * kernel_ops - 1 + bias_ops)
 
     mem_r = bs * (out_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -56,15 +54,13 @@ def eval_bn(node):
     in_numel = int(np.prod(in_shape[1:]))
     
     affine_ops = 1 if affine else 0
-    madds = (affine_ops + 3) * in_numel
 
-    flops = bs * madds
+    flops = bs * (affine_ops + 3) * in_numel
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * in_numel
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -96,15 +92,12 @@ def eval_pool(node):
     bs = out_shape[0]
     out_numel = int(np.prod(out_shape[1:]))
     
-    madds = kernel_ops * out_numel
-
-    flops = bs * 2 * madds
+    flops = bs * kernel_ops * out_numel
 
     mem_r = bs * (out_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -117,11 +110,9 @@ def eval_act(node):
     num_feat = in_shape[1:]
     in_numel = int(np.prod(num_feat))
 
-    madds = in_numel
     flops = mem_r = mem_w = bs * in_numel 
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -141,26 +132,24 @@ def eval_upsample(node):
 
     if mode == "nearest":
         flops = 0
-        madds = 0
     if mode == "linear":
-        madds = out_numel * 5 # 2 muls + 3 add
+        flops = out_numel * 5 # 2 muls + 3 add
     elif mode == "bilinear":
-        madds = out_numel * 13 # 6 muls + 7 adds
+        flops = out_numel * 13 # 6 muls + 7 adds
     elif mode == "bicubic":
         ops_solve_A = 224 # 128 muls + 96 adds
         ops_solve_p = 35 # 16 muls + 12 adds + 4 muls + 3 adds
         ops = (ops_solve_A + ops_solve_p)
-        madds = out_numel * ops
+        flops = out_numel * ops
     elif mode == "trilinear":
         ops = (13 * 2 + 5)
-        madds = out_numel * ops
-    flops = bs * madds
+        flops = out_numel * ops
+    flops = bs * flops
 
     mem_r = bs * (out_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -175,15 +164,13 @@ def eval_linear(node):
     bs = in_shape[0]
     
     bias_ops = 1 if bias else 0
-    madds = out_feat * (in_feat - 1 + bias_ops)
 
-    flops = bs * out_feat * (2 * in_feat - 1 + bias_ops)
+    flops = bs * out_feat * (in_feat - 1 + bias_ops)
 
     mem_r = bs * (in_feat + params)
     mem_w = bs * out_feat
 
     return {
-        'madds': int(madds),
         'flops': int(flops),
         'mem_r': numel_to_bytes(mem_r),
         'mem_w': numel_to_bytes(mem_w),
@@ -191,7 +178,6 @@ def eval_linear(node):
 
 def eval_identity(node):
     return {
-        'madds': 0,
         'flops': 0,
         'mem_r': numel_to_bytes(0),
         'mem_w': numel_to_bytes(0),
@@ -199,7 +185,6 @@ def eval_identity(node):
 
 def eval_nullop(node):
     return {
-        'madds': 0,
         'flops': 0,
         'mem_r': numel_to_bytes(0),
         'mem_w': numel_to_bytes(0),
@@ -239,7 +224,6 @@ def eval_compute_nofwd(node, in_shape=None, out_shape=None):
     if node.num_children == 0:
         eval_compute_prop(node, False)
     else:
-        node['madds'] = 0
         node['flops'] = 0
         node['mem_r'] = 0
         node['mem_w'] = 0
@@ -247,7 +231,6 @@ def eval_compute_nofwd(node, in_shape=None, out_shape=None):
         for n in node.children:
             eval_compute_nofwd(n, n_in, n_out)
             # n_in, n_out = n_out
-            node['madds'] += n['madds']
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']

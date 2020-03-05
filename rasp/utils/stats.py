@@ -50,6 +50,7 @@ def reset_stat(node):
 
 def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, 
          disp_fields=None, report_type='tape', save_path=None):
+    DEV.set_device(device)
     destroy_stats_tree(module)
     stats_tree = build_stats_tree(module)
     if compute:

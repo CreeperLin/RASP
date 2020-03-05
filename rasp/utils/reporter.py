@@ -30,8 +30,8 @@ def round_value(value, binary=False, prec=2):
 
 def report(collected_nodes, include_root=False, report_fields=None):
     if len(collected_nodes)==0: return None
-    all_fields = ['name', 'type', 'in_shape', 'out_shape', 'params', 'madds',
-            'lat', 'net_lat', 'lat[%]', 'flops', 'mem_r', 'mem_w', 'mem_rw',
+    all_fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
+            'lat', 'net_lat', 'lat[%]', 'flops', 'FLOPS', 'mem_r', 'mem_w', 'mem_rw',
             'dev_mem_alloc', 'dev_mem_delta']
     if report_fields is None: report_fields = all_fields
     if include_root:
@@ -66,12 +66,18 @@ def summary(df):
     rep_fields = list(df_fields)
     if 'lat[%]' in df_fields and 'net_lat' in df_fields:
         df['lat[%]'] = 100 * df['net_lat'] / (df['net_lat'].sum() + 1e-16)
+    if 'FLOPS' in df_fields and 'net_lat' in df_fields and 'flops' in df_fields:
+        df['FLOPS'] = 1000 * df['flops'] / df['net_lat']
     agg_fields = ['name']
     agg_val = ['']
     for f in rep_fields:
         try:
-            if f in ['name', 'type', 'in_shape', 'out_shape']: continue
-            tot_val = df[f].sum()
+            if f == 'FLOPS':
+                tot_val = 1000 * df['flops'].sum() / df['net_lat'].sum()
+            elif f in ['name', 'type', 'in_shape', 'out_shape']: 
+                continue
+            else:
+                tot_val = df[f].sum()
             agg_val.append(tot_val)
             agg_fields.append(f)
         except:

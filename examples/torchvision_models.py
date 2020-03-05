@@ -35,9 +35,6 @@ def main():
     device, devlist = get_device(args.device)
 
     config = rasp.set_config({
-        'frontend':{
-            'type': 'pytorch'
-        },
         'profile': {
             'batch_size': 1,
             'num_batches': 5,
@@ -46,18 +43,13 @@ def main():
             'compute_max_depth': -1,
             'verbose': args.verbose,
         },
-        'device': {
-            'type': 'frontend',
-        }, 
-        'analysis': {
-        }
     })
 
-    print('%s | %s | %s | %s | %s' % ('Model', 'Params', 'MAdds', 'FLOPs', 'latency'))
-    print('---|---|---|---|---')
+    print('%s | %s | %s | %s' % ('Model', 'Params', 'FLOPs', 'latency'))
+    print('---|---|---|---')
 
     fields = ['name', 'type', 'in_shape', 'out_shape',
-            'params', 'madds', 'lat', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
+            'params', 'lat', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
     input_shape = (8, 3, 224, 224)
     inputs = torch.randn(input_shape, device=device)
@@ -70,9 +62,9 @@ def main():
         if args.verbose: print(summary)
         _, f = rasp.summary_node(stats, report_fields=fields)
         rasp.profile_off(model)
-        flops, madds, params, latency = f['flops'], f['madds'], f['params'], f['lat']
-        print('%s | %s | %s | %s | %s' % (name, rasp.round_value(params),
-             rasp.round_value(madds), rasp.round_value(flops), rasp.round_value(latency)))
+        flops, params, latency = f['flops'], f['params'], f['lat']
+        print('%s | %s | %s | %s' % (name, rasp.round_value(params),
+            rasp.round_value(flops), rasp.round_value(latency)))
 
 if __name__ == '__main__':
     main()

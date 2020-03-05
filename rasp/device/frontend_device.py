@@ -35,7 +35,8 @@ class FrontendDevice():
         super().__init__()
         self.base_mem = 0
         self.frontend = frontend
-        self.device = device
+        self.device = None
+        self.set_device(device)
 
     def reset(self):
         self.base_mem = 0
@@ -65,6 +66,11 @@ class FrontendDevice():
             return torch.cuda.synchronize
         else:
             return lambda: None
+    
+    def set_device(self, dev):
+        if dev is None:
+            dev = 'cpu'
+        self.device = dev
 
 
 device = None
@@ -85,6 +91,10 @@ def get_max_mem():
 
 def get_base_mem():
     return device.base_mem
+
+
+def set_device(dev):
+    device.set_device(dev)
 
 
 def get_synchronize():

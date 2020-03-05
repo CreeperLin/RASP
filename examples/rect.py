@@ -54,9 +54,6 @@ def main():
     device, devlist = get_device(args.device)
 
     config = rasp.set_config({
-        'frontend':{
-            'type': 'pytorch'
-        },
         'profile': {
             'batch_size': 1,
             'num_batches': 5,
@@ -65,14 +62,9 @@ def main():
             'compute_max_depth': -1,
             'verbose': args.verbose,
         },
-        'device': {
-            'type': 'frontend',
-        }, 
-        'analysis': {
-        }
     })
     
-    fields = ['name', 'type', 'in_shape', 'out_shape', 'params', 'madds', 
+    fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
              'lat', 'net_lat', 'lat[%]', 'flops', 
              'mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
