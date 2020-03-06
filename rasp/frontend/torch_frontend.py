@@ -150,10 +150,33 @@ def get_stdtype(module):
     if typ in _stdtype_map:
         return _stdtype_map[typ]
     if len(list(module.named_children()))==0:
-        logger.warning('torch frontend: unrecognized module: {}\n'.format(str(typ)))
+        logger.debug('torch frontend: unrecognized module: {}\n'.format(str(typ)))
     return 'NONE'
 
-def get_stats_node(m, prefix='', hook=True, tape=True):
+def get_stats_node(m, input_shape=None):
+    if hasattr(m, '_RASPStatNodes'): return m._RASPStatNodes.get(str(input_shape), None)
+    return None 
+
+def get_stats_node_all(m):
+    if hasattr(m, '_RASPStatNodes'): return m._RASPStatNodes
+    return None 
+
+def set_stats_node(m, node, input_shape=None):
+    if not hasattr(m, '_RASPStatNodes'):
+        m._RASPStatNodes = {}
+    m._RASPStatNodes[str(input_shape)] = node
+
+def unset_stats_node(m, input_shape=None):
+    if hasattr(m, '_RASPStatNodes'):
+        del m._RASPStatNodes[str(input_shape)]
+        if len(m) == 0:
+            del m._RASPStatNodes
+
+def unset_stats_node_all(m):
+    if hasattr(m, '_RASPStatNodes'):
+        del m._RASPStatNodes
+
+def build_stats_node(m, prefix, hook, tape):
     node = StatTreeNode(prefix)
     node.module = m
     node['type'] = type(m).__name__
@@ -168,55 +191,71 @@ def get_stats_node(m, prefix='', hook=True, tape=True):
         node.hooks = [h_in, h_out]
     return node
 
-def reg_stats_node(m, prefix='', hook=True, tape=True):
-    if hasattr(m, '_RASPStatNode'): return m._RASPStatNode
-    node = get_stats_node(m, prefix, hook, tape)
-    m._RASPStatNode = node
+def reg_stats_node(m, prefix='', hook=True, tape=False):
+    node = get_stats_node(m)
+    if not node is None:
+        return node
+    node = build_stats_node(m, prefix, hook, tape)
+    set_stats_node(m, node)
     reg_stat(node, m)
     for sn, sm in m.named_children():
         node.add_child(sn, reg_stats_node(sm, prefix+'.'+sn))
     return node
 
 def unreg_stats_node(m):
-    if not hasattr(m, '_RASPStatNode'): return
-    node = m._RASPStatNode
-    if not node.tape is None:
-        node.tape.clear()
-    del node.tape
-    for h in node.hooks:
-        h.remove()
+    nodes = get_stats_node_all(m)
+    if nodes is None: return
+    for node in nodes.values():
+        for h in node.hooks:
+            h.remove()
     for sn, sm in m.named_children():
         unreg_stats_node(sm)
-    del m._RASPStatNode
+    unset_stats_node_all(m)
 
 def hook_module_in(module, input):
     t0 = get_cpu_time()
-    node = module._RASPStatNode
-    if node['stat_mem']:
-        node['dev_mem'] = DEV.get_current_mem()
-        node['net_dev_mem'] = node['dev_mem'] - DEV.get_init_mem()
-    tape = node.tape
+    default_node = get_stats_node(module)
+    input_shape = get_data_shape(input)
+    cur_node = get_stats_node(module, input_shape)
+    if cur_node is None:
+        cur_node = build_stats_node(module, default_node.name, hook=False, tape=True)
+        cur_node.parent = default_node.parent
+        cur_node._children = default_node._children
+        reg_stat(cur_node, module)
+        set_stats_node(module, cur_node, input_shape)
+    if cur_node['stat_mem']:
+        cur_node['dev_mem'] = DEV.get_current_mem()
+        cur_node['net_dev_mem'] = cur_node['dev_mem'] - DEV.get_init_mem()
+    tape = cur_node.tape
+    default_node.tape = tape
     if not tape is None:
         tape.clear()
-        tape.reg_parent('tape')
-    if node['hook_comp']:
-        hook_compute_in(node, get_data_shape(input))
-    if node['hook_time']:
-        hook_time_start(node, t0)
+        tape.reg_parent()
+    if default_node['hook_comp']:
+        hook_compute_in(cur_node, input_shape)
+    if default_node['hook_time']:
+        if cur_node['timer'] is None:
+            cur_node['timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
+            cur_node['net_timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
+        hook_time_start(cur_node, t0)
 
 def hook_module_out(module, input, output):
     t0 = get_cpu_time()
-    node = module._RASPStatNode
-    if node['stat_mem']:
-        node['dev_mem_alloc'] = DEV.get_current_mem() - node['dev_mem']
-        node['dev_max_mem'] = DEV.get_max_mem()
-        node['dev_max_mem_alloc'] = node['dev_max_mem'] - DEV.get_init_mem()
-    node['fwd'] = 1 + (node['fwd'] or 0)
-    if node['hook_comp']:
-        hook_compute_out(node, get_data_shape(input), get_data_shape(output))
-    if node['hook_time']:
-        hook_time_stop(node, t0)
-    DEV.add_node(node)
+    default_node = get_stats_node(module)
+    input_shape = get_data_shape(input)
+    cur_node = get_stats_node(module, input_shape)
+    assert cur_node is not None
+    if cur_node['stat_mem']:
+        cur_node['dev_mem_alloc'] = DEV.get_current_mem() - node['dev_mem']
+        cur_node['dev_max_mem'] = DEV.get_max_mem()
+        cur_node['dev_max_mem_alloc'] = cur_node['dev_max_mem'] - DEV.get_init_mem()
+    cur_node['fwd'] = 1 + (cur_node['fwd'] or 0)
+    if default_node['hook_comp']:
+        hook_compute_out(cur_node, input_shape, get_data_shape(output))
+    if default_node['hook_time']:
+        hook_time_stop(cur_node, t0)
+    default_node.stats.update(cur_node.stats)
+    DEV.add_node(cur_node)
 
 _origin_call = dict()
 def wrap_call(module, *input, **kwargs):
@@ -227,7 +266,7 @@ def wrap_call(module, *input, **kwargs):
 
 def hook_call(module, max_depth=-1):
     if max_depth == 0: return
-    node = module._RASPStatNode
+    node = get_stats_node(module)
     if not module.__class__.__call__ is wrap_call:
         global _origin_call
         _origin_call[module.__class__] = module.__class__.__call__
@@ -236,7 +275,7 @@ def hook_call(module, max_depth=-1):
         hook_call(m, max_depth-1)
 
 def unhook_call(module):
-    node = module._RASPStatNode
+    node = get_stats_node(module)
     if module.__class__.__call__ is wrap_call:
         module.__class__.__call__ = _origin_call[module.__class__]
     for n, m in module.named_children():
@@ -244,17 +283,17 @@ def unhook_call(module):
 
 def hook_timing(module, max_depth=-1):
     if max_depth == 0: return
-    node = module._RASPStatNode
+    node = get_stats_node(module)
     if node['hook_time']: return
-    node['timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
-    node['net_timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
+    # node['timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
+    # node['net_timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
     node['hook_time'] = True
     for n, m in module.named_children():
         hook_timing(m, max_depth-1)
 
 def unhook_timing(module):
-    if not hasattr(module, '_RASPStatNode'): return
-    node = module._RASPStatNode
+    node = get_stats_node(module)
+    if node is None: return
     if not node['hook_time']: return
     node['hook_time'] = False
     for n, m in module.named_children():
@@ -262,15 +301,15 @@ def unhook_timing(module):
 
 def hook_compute(module, max_depth=-1):
     if max_depth == 0: return
-    node = module._RASPStatNode
+    node = get_stats_node(module)
     if node['hook_comp']: return
     node['hook_comp'] = True
     for n, m in module.named_children():
         hook_compute(m, max_depth-1)
 
 def unhook_compute(module):
-    if not hasattr(module, '_RASPStatNode'): return
-    node = module._RASPStatNode
+    node = get_stats_node(module)
+    if node is None: return
     if not node['hook_comp']: return
     node['hook_comp'] = False
     for n, m in module.named_children():

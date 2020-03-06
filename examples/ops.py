@@ -121,6 +121,9 @@ ops = {
     'sep_conv_3x3': lambda C, stride, affine: SepConv(C, C, 3, stride, 1, affine=affine),
     'sep_conv_5x5': lambda C, stride, affine: SepConv(C, C, 5, stride, 2, affine=affine),
     'sep_conv_7x7': lambda C, stride, affine: SepConv(C, C, 7, stride, 3, affine=affine),
+    'std_conv_3x3': lambda C, stride, affine: StdConv(C, C, 3, stride, 1, affine=affine),
+    'std_conv_5x5': lambda C, stride, affine: StdConv(C, C, 5, stride, 2, affine=affine),
+    'std_conv_7x7': lambda C, stride, affine: StdConv(C, C, 7, stride, 3, affine=affine),
     'dil_conv_3x3': lambda C, stride, affine: DilConv(C, C, 3, stride, 2, 2, affine=affine), # 5x5
     'dil_conv_5x5': lambda C, stride, affine: DilConv(C, C, 5, stride, 4, 2, affine=affine), # 9x9
     'conv_7x1_1x7': lambda C, stride, affine: FacConv(C, C, 7, stride, 3, affine=affine),
@@ -149,6 +152,7 @@ def main():
     parser.add_argument('-d','--device',type=str,default="all", help="device ids")
     parser.add_argument('-v','--verbose',action='store_true', help="verbose msg")
     parser.add_argument('-t','--timing',action='store_true', help="enable timing")
+    parser.add_argument('-i','--input',type=str,default='(8, 64, 224, 224)', help='input shape')
     args = parser.parse_args()
 
     device, devlist = get_device(args.device)
@@ -156,37 +160,35 @@ def main():
     config = rasp.set_config({
         'profile': {
             'batch_size': 1,
-            'num_batches': 5,
-            'warmup_batches': 5,
+            'num_batches': 100,
+            'warmup_batches': 10,
             'timing_max_depth': -1,
             'compute_max_depth': -1,
             'verbose': args.verbose,
         },
     })
 
-    print("%s | %s | %s" % ("Model", "Params", "FLOPs"))
-    print("---|---|---")
+    print("%s | %s | %s | %s" % ("Model", "Params", "FLOPs", "FLOPS"))
+    print("---|---|---|---")
 
     fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
-             'lat', 'net_lat', 'lat[%]', 'flops',
+             'lat', 'net_lat', 'lat[%]', 'flops', 'FLOPS',
              'mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
-    chn_in = 16
-    fm_size = 224
-    input_shape = (1, chn_in, fm_size, fm_size)
+    input_shape = tuple(eval(args.input))
+    chn_in = input_shape[1]
     inputs = torch.randn(input_shape, device=device)
     
     for i, name in enumerate(ops):
-        model = ops[name](chn_in, stride=1, affine=True).to(device=device)
-        stats = rasp.profile_compute_once(model, inputs=inputs)
-        if args.timing: stats = rasp.profile_timing_once(model, inputs=inputs)
-        summary, _ = rasp.summary_tape(stats, report_fields=fields)
-        if args.verbose: print(summary)
-        _, total_f = rasp.summary_node(stats, report_fields=fields)
+        model = ops[name](chn_in, stride=1, affine=True)
+        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_only=False)
+        if args.verbose:
+            print(summary)
         rasp.profile_off(model)
-        total_flops, total_params = total_f['flops'], total_f['params']
-        print("%s | %s | %s" % (name, rasp.round_value(total_params),
-             rasp.round_value(total_flops)))
+        total_f = df.tail(1)
+        total_flops, total_params, total_FLOPS = total_f.flops[0], total_f.params[0], total_f.FLOPS[0]
+        print("%s | %s | %s | %s" % (name, rasp.round_value(total_params),
+             rasp.round_value(total_flops), rasp.round_value(total_FLOPS)))
 
 if __name__ == '__main__':
     main()

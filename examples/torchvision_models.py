@@ -30,6 +30,7 @@ def main():
     parser.add_argument('-d','--device',type=str,default='all', help='device ids')
     parser.add_argument('-v','--verbose',action='store_true', help='verbose msg')
     parser.add_argument('-t','--timing',action='store_true', help='enable timing')
+    parser.add_argument('-i','--input',type=str,default='(1, 3, 224, 224)', help='input shape')
     args = parser.parse_args()
 
     device, devlist = get_device(args.device)
@@ -37,7 +38,7 @@ def main():
     config = rasp.set_config({
         'profile': {
             'batch_size': 1,
-            'num_batches': 5,
+            'num_batches': 50,
             'warmup_batches': 5,
             'timing_max_depth': -1,
             'compute_max_depth': -1,
@@ -45,26 +46,25 @@ def main():
         },
     })
 
-    print('%s | %s | %s | %s' % ('Model', 'Params', 'FLOPs', 'latency'))
-    print('---|---|---|---')
+    print('%s | %s | %s | %s | %s' % ('Model', 'Params', 'FLOPs', 'latency', 'FLOPS'))
+    print('---|---|---|---|---')
 
     fields = ['name', 'type', 'in_shape', 'out_shape',
-            'params', 'lat', 'net_lat', 'lat[%]', 'flops', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
+            'params', 'lat', 'net_lat', 'lat[%]', 'flops', 'FLOPS', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
 
-    input_shape = (8, 3, 224, 224)
+    input_shape = tuple(eval(args.input))
     inputs = torch.randn(input_shape, device=device)
     
     for i, name in enumerate(model_names):
         model = models.__dict__[name]().to(device=device)
-        stats = rasp.profile_compute_once(model, inputs=inputs)
-        if args.timing: stats = rasp.profile_timing_once(model, inputs=inputs)
-        summary, _ = rasp.summary_tape(stats, report_fields=fields)
-        if args.verbose: print(summary)
-        _, f = rasp.summary_node(stats, report_fields=fields)
+        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_only=False)
+        if args.verbose:
+            print(summary)
+        total_f = df.tail(1)
         rasp.profile_off(model)
-        flops, params, latency = f['flops'], f['params'], f['lat']
-        print('%s | %s | %s | %s' % (name, rasp.round_value(params),
-            rasp.round_value(flops), rasp.round_value(latency)))
+        FLOPS, flops, params, latency = total_f.FLOPS[0], total_f.flops[0], total_f.params[0], total_f.lat[0]
+        print('%s | %s | %s | %s | %s' % (name, rasp.round_value(params),
+            rasp.round_value(flops), rasp.round_value(latency), rasp.round_value(FLOPS)))
 
 if __name__ == '__main__':
     main()

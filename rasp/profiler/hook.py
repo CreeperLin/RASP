@@ -8,7 +8,7 @@ class Tape():
         self.node = node
         self.accessed = False
     
-    def reg_parent(self, name):
+    def reg_parent(self, name='tape'):
         self.accessed = True
         node = self.node
         parent = node.fwd_parent if hasattr(node,'fwd_parent') else node.parent
@@ -31,15 +31,12 @@ class Tape():
 
     @property
     def items_all(self):
-        tape = list()
         for i in self.tape:
-            if i.num_children == 0:
-                tape.append(i)
-                continue
+            flag = True
             for it in i.tape.items_all:
-                tape.append(it)
-        for i in tape:
-            yield i
+                yield it
+                flag = False
+            if flag: yield i
     
     def clear(self):
         self.tape.clear()
@@ -49,7 +46,7 @@ def hook_compute_in(node, in_shape):
     pass
 
 def hook_compute_out(node, in_shape, out_shape):
-    # if node['compute_updated']: return
+    if node['compute_updated']: return
     tape = node.tape
     node['in_shape'] = in_shape
     node['out_shape'] = out_shape
@@ -75,11 +72,10 @@ def hook_time_start(node, t):
     node['net_timer'].rec(include=False)
 
 def hook_time_stop(node, t):
-    tape = node.tape
     net_timer = node['net_timer']
-    # net_timer.rec(t=t, include=True)
     net_timer.rec(include=True)
     net_lat = lat = net_timer.mean()
+    tape = node.tape
     for n in tape.items:
         lat -= n['prof_overhead']
         net_lat -= n['tot_lat'] 

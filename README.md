@@ -30,6 +30,12 @@ Specify device
 rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True)
 ```
 
+Export DataFrame
+
+```python
+summary, df = rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True, print_only=False)
+```
+
 Customize profiling parameters
 
 ```python

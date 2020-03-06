@@ -8,6 +8,8 @@ pd.set_option('display.max_rows', 10000)
 pd.set_option('display.max_columns', 10000)
 
 def get_unit_name(field_name):
+    if field_name == 'FLOPS':
+        return 'flops/s'
     if 'mem' in field_name:
         return 'Byte'
     if 'lat' in field_name:
@@ -28,12 +30,14 @@ def round_value(value, binary=False, prec=2):
     return str(round(value, prec))
 
 
-def report(collected_nodes, include_root=False, report_fields=None):
+def report(collected_nodes, include_root=False, report_fields=None, excludes=None):
     if len(collected_nodes)==0: return None
     all_fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
             'lat', 'net_lat', 'lat[%]', 'flops', 'FLOPS', 'mem_r', 'mem_w', 'mem_rw',
             'dev_mem_alloc', 'dev_mem_delta']
     if report_fields is None: report_fields = all_fields
+    if not excludes is None:
+        report_fields = [f for f in report_fields if not f in excludes]
     if include_root:
         root = collected_nodes[0].root
         collected_nodes.append(root)
@@ -73,7 +77,10 @@ def summary(df):
     for f in rep_fields:
         try:
             if f == 'FLOPS':
-                tot_val = 1000 * df['flops'].sum() / df['net_lat'].sum()
+                if df['net_lat'].sum() > 1e-7:
+                    tot_val = 1000 * df['flops'].sum() / df['net_lat'].sum()
+                else:
+                    tot_val = 0
             elif f in ['name', 'type', 'in_shape', 'out_shape']: 
                 continue
             else:
@@ -95,22 +102,22 @@ def summary(df):
         if f in ['mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']:
             binary = True
         sum_str += "Total {}: {} {}\n".format(f, round_value(v, binary, prec=2), get_unit_name(f))
-    return sum_str, total_df
+    return sum_str, df
 
-def summary_leaves(node, include_root=False, report_fields=None):
-    return summary(report(list(node.leaves()), include_root=include_root, report_fields=report_fields))
+def summary_leaves(node, include_root=False, report_fields=None, excludes=None):
+    return summary(report(list(node.leaves()), include_root=include_root, report_fields=report_fields, excludes=excludes))
 
-def summary_all(node, include_root=False, report_fields=None):
-    return summary(report(list(node.subnodes()), include_root=include_root, report_fields=report_fields))
+def summary_all(node, include_root=False, report_fields=None, excludes=None):
+    return summary(report(list(node.subnodes()), include_root=include_root, report_fields=report_fields, excludes=excludes))
 
-def summary_tape(node, include_root=False, report_fields=None):
-    return summary(report(list(node.tape.items_all), include_root=include_root, report_fields=report_fields))
+def summary_tape(node, include_root=False, report_fields=None, excludes=None):
+    return summary(report(list(node.tape.items_all), include_root=include_root, report_fields=report_fields, excludes=excludes))
 
-def summary_node(node, include_root=False, report_fields=None):
-    return summary(report([node], include_root=include_root, report_fields=report_fields))
+def summary_node(node, include_root=False, report_fields=None, excludes=None):
+    return summary(report([node], include_root=include_root, report_fields=report_fields, excludes=excludes))
 
-def summary_root(node, include_root=False, report_fields=None):
-    return summary(report([node.root], include_root=include_root, report_fields=report_fields))
+def summary_root(node, include_root=False, report_fields=None, excludes=None):
+    return summary(report([node.root], include_root=include_root, report_fields=report_fields, excludes=excludes))
 
 def load_report(path):
     df = pd.read_csv(path, converters={'name':str})
