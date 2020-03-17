@@ -63,3 +63,13 @@ Save report
 ```python
 rasp.stat(model, input_shape=(1, 3, 224, 224), timing=True, save_path='./reports')
 ```
+
+## Addons
+
+### Energy Cost
+
+```python
+import rasp
+import rasp.addons.energy
+rasp.stat(model, input_shape=(1, 3, 224, 224), includes=['energy'])
+```

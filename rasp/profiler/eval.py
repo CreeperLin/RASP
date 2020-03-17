@@ -1,17 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-def numel_to_bytes(numel, prec='float'):
-    if prec == 'double':
-        byte = numel * 8
-    elif prec == 'half':
-        byte = numel * 2
-    elif prec == 'float':
-        byte = numel * 4
-    else:
-        byte = numel * 4
-    return int(byte)
-
 def eval_conv(node):
     in_c = node['C_in']
     out_c = node['C_out']
@@ -40,8 +29,8 @@ def eval_conv(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_bn(node):
@@ -62,8 +51,8 @@ def eval_bn(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_pool(node):
@@ -99,8 +88,8 @@ def eval_pool(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_act(node):
@@ -114,8 +103,8 @@ def eval_act(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_upsample(node):
@@ -151,8 +140,8 @@ def eval_upsample(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_linear(node):
@@ -172,47 +161,62 @@ def eval_linear(node):
 
     return {
         'flops': int(flops),
-        'mem_r': numel_to_bytes(mem_r),
-        'mem_w': numel_to_bytes(mem_w),
+        'mem_r': mem_r,
+        'mem_w': mem_w,
     }
 
 def eval_identity(node):
     return {
         'flops': 0,
-        'mem_r': numel_to_bytes(0),
-        'mem_w': numel_to_bytes(0),
+        'mem_r': 0,
+        'mem_w': 0,
     }
 
 def eval_nullop(node):
     return {
         'flops': 0,
-        'mem_r': numel_to_bytes(0),
-        'mem_w': numel_to_bytes(0),
+        'mem_r': 0,
+        'mem_w': 0,
     }
+
+
+_evaluators = {}
+_evaluators_all = []
+
+
+def add_evaluator(ntype, func):
+    if ntype == 'all':
+        _evaluators_all.append(func)
+        return
+    if not isinstance(ntype, list):
+        ntype = [ntype]
+    for typ in ntype:
+        evals = _evaluators.get(typ, None)
+        if evals is None:
+            evals = []
+            _evaluators[typ] = evals
+        evals.append(func)
+
+
+def get_evaluators(ntype, default=None):
+    if ntype == 'all':
+        return _evaluators_all
+    evals = _evaluators.get(ntype, None)
+    if evals is None:
+        return [] if default is None else [default]
+    return evals
 
 
 def eval_compute_prop(node, mark_updated=True):
     if node['compute_updated']: return
     assert not node['in_shape'] is None
+    ntype = node['type']
     stdtype = node['stdtype']
-    if stdtype == 'CONV':
-        m_stats = eval_conv(node)
-    elif stdtype == 'BN':
-        m_stats = eval_bn(node)
-    elif stdtype == 'POOL':
-        m_stats = eval_pool(node)
-    elif stdtype == 'ACT':
-        m_stats = eval_act(node)
-    elif stdtype == 'UPSMPL':
-        m_stats = eval_upsample(node)
-    elif stdtype == 'FC':
-        m_stats = eval_linear(node)
-    elif stdtype == 'IDT':
-        m_stats = eval_identity(node)
-    else:
-        # print(f"compute {stdtype} is not supported!")
-        m_stats = eval_nullop(node)
-    node.update_values(m_stats)
+    evals = get_evaluators(stdtype, eval_nullop)
+    evals.extend(get_evaluators(ntype))
+    evals.extend(get_evaluators('all'))
+    for eval_fn in evals:
+        node.update_values(eval_fn(node))
     if mark_updated:
         node['compute_updated'] = True
 
@@ -234,3 +238,12 @@ def eval_compute_nofwd(node, in_shape=None, out_shape=None):
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']
+
+
+add_evaluator('CONV', eval_conv)
+add_evaluator('BN', eval_bn)
+add_evaluator('POOL', eval_pool)
+add_evaluator('IDT', eval_identity)
+add_evaluator('FC', eval_linear)
+add_evaluator('ACT', eval_act)
+add_evaluator('UPSMPL', eval_upsample)

@@ -18,7 +18,9 @@ def get_num_params(module):
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
 
 def get_dtype(module):
-    pass
+    p_list = list(module.parameters())
+    if len(p_list) == 0: return None
+    return str(p_list[0].dtype)[6:]
 
 def get_data_shape(data):
     if isinstance(data, (tuple, list)):
@@ -183,6 +185,7 @@ def build_stats_node(m, prefix, hook, tape):
     node['stdtype'] = get_stdtype(m)
     node['name'] = prefix
     node['params'] = get_num_params(m)
+    node['dtype'] = get_dtype(m)
     node.tape = Tape(node=node) if tape else None
     node.hooks = []
     if hook:

@@ -59,7 +59,7 @@ def reset_stat(node):
 
 
 def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, print_only=True,
-         report_type='tape', include_root=False, report_fields=None, excludes=None, save_path=None):
+         report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None):
     excludes = [] if excludes is None else excludes
     DEV.set_device(device)
     destroy_stats_tree(module)
@@ -85,7 +85,7 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
     else:
         raise ValueError('unsupported report type: {}'.format(report_type))
     if not reporter is None:
-        sum_str, df = reporter(stats_tree, include_root, report_fields, excludes)
+        sum_str, df = reporter(stats_tree, include_root, report_fields, includes, excludes)
         if not save_path is None:
             save_report(df, save_path)
         if print_only: 
