@@ -62,7 +62,13 @@ def main():
             print(summary)
         total_f = df.tail(1)
         rasp.profile_off(model)
-        FLOPS, flops, params, latency = total_f.FLOPS[0], total_f.flops[0], total_f.params[0], total_f.lat[0]
+        flops, params = total_f.flops[0], total_f.params[0]
+        if args.timing:
+            latency = total_f.lat[0]
+            FLOPS = total_f.FLOPS[0]
+        else:
+            latency = 0
+            FLOPS = 0
         print('%s | %s | %s | %s | %s' % (name, rasp.round_value(params),
             rasp.round_value(flops), rasp.round_value(latency), rasp.round_value(FLOPS)))
 

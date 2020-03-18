@@ -17,6 +17,7 @@ def eval_conv(node):
     oh, ow = (ih + 2 * ph - kh) / sh + 1, (iw + 2 * pw - kw) / sw + 1
     out_feat = oh * ow
     out_numel = out_c * out_feat
+    in_numel = in_c * ih * iw
     
     kernel_numel = int(np.prod(kernel_size))
     bias_ops = 1 if bias else 0
@@ -24,7 +25,7 @@ def eval_conv(node):
 
     flops = bs * out_numel * (in_c // groups * kernel_ops - 1 + bias_ops)
 
-    mem_r = bs * (out_numel + params)
+    mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {
@@ -80,10 +81,11 @@ def eval_pool(node):
 
     bs = out_shape[0]
     out_numel = int(np.prod(out_shape[1:]))
+    in_numel = int(np.prod(in_shape[1:]))
     
     flops = bs * kernel_ops * out_numel
 
-    mem_r = bs * (out_numel + params)
+    mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {
@@ -118,6 +120,7 @@ def eval_upsample(node):
     bs = out_shape[0:]
     out_feat = out_shape[1:]
     out_numel = int(np.prod(out_feat))
+    in_numel = int(np.prod(in_shape[1:]))
 
     if mode == "nearest":
         flops = 0
@@ -135,7 +138,7 @@ def eval_upsample(node):
         flops = out_numel * ops
     flops = bs * flops
 
-    mem_r = bs * (out_numel + params)
+    mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {

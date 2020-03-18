@@ -27,6 +27,8 @@ energy_cost_table = {
     'float32_dram': 640.0,
 }
 
+cache_hit_rate = 0.8
+
 
 def get_energy_cost(dtype, key):
     return energy_cost_table.get('{}_{}'.format(dtype, key), None)
@@ -40,9 +42,13 @@ def eval_energy_default(node):
     dtype = node['dtype']
     if dtype is None:
         dtype = 'float32'
-    energy = node['flops'] * get_energy_cost(dtype, 'mult') + (node['mem_r'] + node['mem_w']) * get_energy_cost(dtype, 'dram')
+    energy_compute = node['flops'] * get_energy_cost(dtype, 'mult')
+    total_mem = (node['mem_r'] + node['mem_w'])
+    sram_rw = total_mem * cache_hit_rate
+    dram_rw = total_mem * (1 - cache_hit_rate)
+    energy_memory = dram_rw * get_energy_cost(dtype, 'dram') + sram_rw * get_energy_cost(dtype, 'sram')
     return {
-        'energy': energy
+        'energy': energy_compute + energy_memory
     }
 
 
