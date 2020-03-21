@@ -226,15 +226,15 @@ def hook_module_in(module, input):
         cur_node._children = default_node._children
         reg_stat(cur_node, module)
         set_stats_node(module, cur_node, input_shape)
-    if cur_node['stat_mem']:
+    if default_node['stat_mem']:
         cur_node['dev_mem'] = DEV.get_current_mem()
         cur_node['net_dev_mem'] = cur_node['dev_mem'] - DEV.get_init_mem()
-    tape = cur_node.tape
-    default_node.tape = tape
-    if not tape is None:
-        tape.clear()
-        tape.reg_parent()
     if default_node['hook_comp']:
+        tape = cur_node.tape
+        default_node.tape = tape
+        if not tape is None:
+            tape.clear()
+            tape.reg_parent()
         hook_compute_in(cur_node, input_shape)
     if default_node['hook_time']:
         if cur_node['timer'] is None:
