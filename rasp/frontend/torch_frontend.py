@@ -10,6 +10,8 @@ from ..utils.time import Timer, get_cpu_time, get_time
 from .. import device as DEV
 
 logger = logging.getLogger('rasp')
+STAT_MEM = False
+MARK_UPDATED = False
 
 def init():
     pass
@@ -231,9 +233,9 @@ def hook_module_in(module, input):
         cur_node._children = default_node._children
         reg_stat(cur_node, module)
         set_stats_node(module, cur_node, input_shape)
-    if default_node['stat_mem']:
+    if STAT_MEM:
         cur_node['dev_mem'] = DEV.get_current_mem()
-        cur_node['net_dev_mem'] = cur_node['dev_mem'] - DEV.get_init_mem()
+        cur_node['net_dev_mem'] = cur_node['dev_mem'] - DEV.get_base_mem()
     if default_node['hook_comp']:
         tape = cur_node.tape
         default_node.tape = tape
@@ -253,13 +255,13 @@ def hook_module_out(module, input, output):
     input_shape = get_data_shape(input)
     cur_node = get_stats_node(module, input_shape)
     assert cur_node is not None
-    if cur_node['stat_mem']:
-        cur_node['dev_mem_alloc'] = DEV.get_current_mem() - node['dev_mem']
+    if STAT_MEM:
+        cur_node['dev_mem_alloc'] = DEV.get_current_mem() - cur_node['dev_mem']
         cur_node['dev_max_mem'] = DEV.get_max_mem()
-        cur_node['dev_max_mem_alloc'] = cur_node['dev_max_mem'] - DEV.get_init_mem()
+        cur_node['dev_max_mem_alloc'] = cur_node['dev_max_mem'] - DEV.get_base_mem()
     cur_node['fwd'] = 1 + (cur_node['fwd'] or 0)
     if default_node['hook_comp']:
-        hook_compute_out(cur_node, input_shape, get_data_shape(output))
+        hook_compute_out(cur_node, input_shape, get_data_shape(output), MARK_UPDATED)
     if default_node['hook_time']:
         hook_time_stop(cur_node, t0)
     default_node.stats.update(cur_node.stats)
@@ -293,8 +295,6 @@ def hook_timing(module, max_depth=-1):
     if max_depth == 0: return
     node = get_stats_node(module)
     if node['hook_time']: return
-    # node['timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
-    # node['net_timer'] = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
     node['hook_time'] = True
     for n, m in module.named_children():
         hook_timing(m, max_depth-1)

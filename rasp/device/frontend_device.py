@@ -39,16 +39,20 @@ class FrontendDevice():
         self.set_device(device)
 
     def reset(self):
-        self.base_mem = 0
+        self.base_mem = self.get_current_mem()
     
+    def get_base_mem(self):
+        return self.base_mem
+
     def get_current_mem(self):
         if self.device == 'cpu':
             if psutil is None:
                 logger.error('psutil not installed')
                 return 0
             return psutil.Process(os.getpid()).memory_info().rss
-        if self.frontend == 'torch':
+        if self.frontend == 'pytorch':
             return get_torch_current_mem(self.device)
+        return 0
     
     def get_max_mem(self):
         if self.device == 'cpu':
@@ -56,7 +60,7 @@ class FrontendDevice():
                 return psutil.Process(os.getpid()).memory_info().rss
             else:
                 return self.get_current_mem()
-        if self.frontend == 'torch':
+        if self.frontend == 'pytorch':
             return get_torch_current_mem(self.device)
     
     def get_synchronize(self):

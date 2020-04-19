@@ -49,7 +49,10 @@ default_conf = {
 class Config():
     def __getattr__(self, k):
         global global_config
-        return global_config.__getattr__(k)
+        try:
+            return global_config.__getattr__(k)
+        except:
+            return None
     
     def __setattr__(self, k, v):
         global global_config

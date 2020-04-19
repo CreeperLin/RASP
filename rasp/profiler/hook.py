@@ -45,18 +45,19 @@ class Tape():
 def hook_compute_in(node, in_shape):
     pass
 
-def hook_compute_out(node, in_shape, out_shape):
+def hook_compute_out(node, in_shape, out_shape, mark_updated=False):
     if node['compute_updated']: return
     tape = node.tape
     node['in_shape'] = in_shape
     node['out_shape'] = out_shape
     if node.num_children==0:
-        eval_compute_prop(node, True)
+        eval_compute_prop(node)
     elif not tape is None:
         # TODO custom layer measurement
         node['flops'] = 0
         node['mem_r'] = 0
         node['mem_w'] = 0
+        node['params'] = 0
         last_n = None
         for n in tape.items:
             if not last_n is None and not n['dev_mem'] is None:
@@ -64,7 +65,9 @@ def hook_compute_out(node, in_shape, out_shape):
             node['flops'] += n['flops']
             node['mem_r'] += n['mem_r']
             node['mem_w'] += n['mem_w']
+            node['params'] += n['params']
             last_n = n
+    if mark_updated:
         node['compute_updated'] = True
 
 def hook_time_start(node, t):

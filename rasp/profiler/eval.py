@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
+def prod(arr):
+    ret = 1
+    for i in arr:
+        ret *= i
+    return ret
+
 def eval_conv(node):
-    in_c = node['C_in']
-    out_c = node['C_out']
-    params = node['params']
     kernel_size = node['kernel_size']
     sh, sw = node['stride']
     ph, pw = node['padding']
@@ -12,16 +15,15 @@ def eval_conv(node):
     groups = node['groups']
     in_shape = node['in_shape']
     out_shape = node['out_shape']
-    bs, _, ih, iw = in_shape
-    kh, kw = kernel_size[:2]
-    oh, ow = (ih + 2 * ph - kh) / sh + 1, (iw + 2 * pw - kw) / sw + 1
-    out_feat = oh * ow
-    out_numel = out_c * out_feat
+    bs, in_c, ih, iw = in_shape
+    _, out_c, oh, ow = out_shape
+    out_numel = out_c * oh * ow
     in_numel = in_c * ih * iw
     
-    kernel_numel = int(np.prod(kernel_size))
+    kernel_numel = prod(kernel_size)
     bias_ops = 1 if bias else 0
     kernel_ops = kernel_numel
+    params = out_c * in_c * kernel_numel // groups + out_c * bias_ops
 
     flops = bs * out_numel * (in_c // groups * kernel_ops - 1 + bias_ops)
 
@@ -32,20 +34,21 @@ def eval_conv(node):
         'flops': int(flops),
         'mem_r': mem_r,
         'mem_w': mem_w,
+        'params': params,
     }
 
 def eval_bn(node):
-    params = node['params']
     affine = node['affine']
     running_stats = node['running_stats']
     in_shape = node['in_shape']
     num_feat = node['num_feat']
     bs = in_shape[0]
-    in_numel = int(np.prod(in_shape[1:]))
+    in_numel = prod(in_shape[1:])
     
     affine_ops = 1 if affine else 0
 
     flops = bs * (affine_ops + 3) * in_numel
+    params = 2 * affine_ops * in_shape[1]
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * in_numel
@@ -54,6 +57,7 @@ def eval_bn(node):
         'flops': int(flops),
         'mem_r': mem_r,
         'mem_w': mem_w,
+        'params': params
     }
 
 def eval_pool(node):
@@ -64,24 +68,21 @@ def eval_pool(node):
     out_shape = node['out_shape']
     in_feat = in_shape[2:]
     if adapt:
-        in_shape = np.array(in_shape)
-        out_shape = np.array(out_shape)
-        s = in_shape // out_shape
-        k = in_shape - (out_shape-1) * s
+        k = [in_d - (out_d-1) * in_d // out_d for in_d, out_d in zip(in_shape, out_shape)]
         p = 0
     else:
         k = node['kernel_size']
         s = node['stride']
         p = node['padding']
-    kernel_numel = int(np.prod(k))
+    kernel_numel = prod(k)
 
     kernel_mul = 1 if ptype == 'avg' else 0
     kernel_add = kernel_numel - 1
     kernel_ops = kernel_mul + kernel_add
 
     bs = out_shape[0]
-    out_numel = int(np.prod(out_shape[1:]))
-    in_numel = int(np.prod(in_shape[1:]))
+    out_numel = prod(out_shape[1:])
+    in_numel = prod(in_shape[1:])
     
     flops = bs * kernel_ops * out_numel
 
@@ -99,7 +100,7 @@ def eval_act(node):
     in_shape = node['in_shape']
     bs = in_shape[0]
     num_feat = in_shape[1:]
-    in_numel = int(np.prod(num_feat))
+    in_numel = prod(num_feat)
 
     flops = mem_r = mem_w = bs * in_numel 
 
@@ -110,8 +111,6 @@ def eval_act(node):
     }
 
 def eval_upsample(node):
-    C_in = node['C_in']
-    C_out = node['C_out']
     params = node['params']
     in_shape = node['in_shape']
     out_shape = node['out_shape']
@@ -119,8 +118,8 @@ def eval_upsample(node):
 
     bs = out_shape[0:]
     out_feat = out_shape[1:]
-    out_numel = int(np.prod(out_feat))
-    in_numel = int(np.prod(in_shape[1:]))
+    out_numel = prod(out_feat)
+    in_numel = prod(in_shape[1:])
 
     if mode == "nearest":
         flops = 0
@@ -150,7 +149,6 @@ def eval_upsample(node):
 def eval_linear(node):
     in_feat = node['in_feat']
     out_feat = node['out_feat']
-    params = node['params']
     bias = node['bias']
     in_shape = node['in_shape']
     bs = in_shape[0]
@@ -158,6 +156,7 @@ def eval_linear(node):
     bias_ops = 1 if bias else 0
 
     flops = bs * out_feat * (in_feat - 1 + bias_ops)
+    params = out_feat * (in_feat + bias_ops)
 
     mem_r = bs * (in_feat + params)
     mem_w = bs * out_feat
@@ -166,6 +165,7 @@ def eval_linear(node):
         'flops': int(flops),
         'mem_r': mem_r,
         'mem_w': mem_w,
+        'params': params
     }
 
 def eval_identity(node):
@@ -210,7 +210,7 @@ def get_evaluators(ntype, default=None):
     return evals
 
 
-def eval_compute_prop(node, mark_updated=True):
+def eval_compute_prop(node):
     if node['compute_updated']: return
     assert not node['in_shape'] is None
     ntype = node['type']
@@ -220,8 +220,6 @@ def eval_compute_prop(node, mark_updated=True):
     evals.extend(get_evaluators('all'))
     for eval_fn in evals:
         node.update_values(eval_fn(node))
-    if mark_updated:
-        node['compute_updated'] = True
 
 
 def eval_compute_nofwd(node, in_shape=None, out_shape=None):
@@ -229,7 +227,7 @@ def eval_compute_nofwd(node, in_shape=None, out_shape=None):
     node['in_shape'] = in_shape
     node['out_shape'] = out_shape
     if node.num_children == 0:
-        eval_compute_prop(node, False)
+        eval_compute_prop(node)
     else:
         node['flops'] = 0
         node['mem_r'] = 0
