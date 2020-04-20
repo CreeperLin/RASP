@@ -58,12 +58,16 @@ def reset_stat(node):
     reset_timing_all(node)
 
 
-def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, print_only=True,
+def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_only=True,
          report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None):
     excludes = [] if excludes is None else excludes
+    includes = [] if includes is None else includes
     DEV.set_device(device)
     destroy_stats_tree(module)
     stats_tree = build_stats_tree(module)
+    if memory:
+        stat_memory_on()
+        includes.extend(['net_dev_mem', 'dev_mem_alloc', 'dev_max_mem_alloc'])
     if compute:
         profile_compute_once(module, input_shape, inputs, device)
     if timing:
@@ -126,6 +130,14 @@ def profile_batch(module, inputs, device):
             timer.rec(include=True)
     # print(timer.stat())
     return timer.mean()
+
+
+def stat_memory_on():
+    CFG.frontend.stat_mem = True
+    
+
+def stat_memory_off():
+    CFG.frontend.stat_mem = False
 
 
 def profile_compute_once(module, input_shape=None, inputs=None, device=None):

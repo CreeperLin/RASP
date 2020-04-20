@@ -30,6 +30,16 @@ Specify device
 rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True)
 ```
 
+For memory usage (CUDA)
+
+```python
+rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', memory=True)
+```
+
+net_dev_mem: total device memory used
+dev_mem_alloc: additional memory allocated (increased from last net_dev_mem)
+dev_max_mem_alloc: maximum additional memory allocated
+
 Export DataFrame
 
 ```python

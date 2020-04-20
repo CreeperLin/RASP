@@ -25,6 +25,8 @@ default_conf = {
     'frontend':{
         'type': 'pytorch',
         'args': {},
+        'stat_mem': False,
+        'mark_updated': False,
     },
     'profile': {
         'batch_size': 1,
