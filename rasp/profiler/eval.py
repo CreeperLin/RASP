@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 
 def prod(arr):
+    if not isinstance(arr, (tuple, list)):
+        return arr
     ret = 1
     for i in arr:
         ret *= i
