@@ -73,7 +73,7 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
     if timing:
         profile_timing_once(module, input_shape, inputs, device)
     else:
-        excludes.extend(['lat', 'net_lat'])
+        excludes.extend(['lat', 'net_lat', 'lat[%]', 'FLOPS'])
     if report_type is None:
         reporter = None
     if report_type == 'all':

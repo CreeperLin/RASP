@@ -34,6 +34,7 @@ class FrontendDevice():
     def __init__(self, frontend, device):
         super().__init__()
         self.base_mem = 0
+        self.max_mem = 0
         self.frontend = frontend
         self.device = None
         self.set_device(device)
@@ -63,6 +64,10 @@ class FrontendDevice():
         if self.frontend == 'pytorch':
             return get_torch_current_mem(self.device)
     
+    def reset_max_mem(self):
+        if self.frontend == 'pytorch':
+            torch.cuda.reset_max_memory_allocated()
+
     def get_synchronize(self):
         if self.device == 'cpu':
             return lambda: None
@@ -91,6 +96,10 @@ def get_current_mem():
 
 def get_max_mem():
     return device.get_max_mem()
+
+
+def reset_max_mem():
+    return device.reset_max_mem()
 
 
 def get_base_mem():

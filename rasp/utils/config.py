@@ -27,6 +27,7 @@ default_conf = {
         'args': {},
         'stat_mem': False,
         'mark_updated': False,
+        'reset_max_mem': False,
     },
     'profile': {
         'batch_size': 1,

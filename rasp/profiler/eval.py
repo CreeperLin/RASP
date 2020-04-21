@@ -26,13 +26,16 @@ def eval_conv(node):
     kernel_ops = kernel_numel
     params = out_c * in_c * kernel_numel // groups + out_c * bias_ops
 
-    flops = bs * out_numel * (in_c // groups * kernel_ops - 1 + bias_ops)
+    kernel_macc = in_c // groups * kernel_ops
+    flops = bs * out_numel * (kernel_macc * 2 - 1 + bias_ops)
+    macc = bs * out_numel * (kernel_macc + bias_ops)
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
         'params': params,
@@ -48,14 +51,16 @@ def eval_bn(node):
     
     affine_ops = 1 if affine else 0
 
-    flops = bs * (affine_ops + 3) * in_numel
+    macc = bs * (affine_ops + 1) * in_numel
+    flops = 2 * macc
     params = 2 * affine_ops * in_shape[1]
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * in_numel
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
         'params': params
@@ -77,7 +82,7 @@ def eval_pool(node):
         p = node['padding']
     kernel_numel = prod(k)
 
-    kernel_mul = 1 if ptype == 'avg' else 0
+    kernel_mul = kernel_numel if ptype == 'avg' else 0
     kernel_add = kernel_numel - 1
     kernel_ops = kernel_mul + kernel_add
 
@@ -86,12 +91,14 @@ def eval_pool(node):
     in_numel = prod(in_shape[1:])
     
     flops = bs * kernel_ops * out_numel
+    macc = bs * kernel_numel * out_numel
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
     }
@@ -103,10 +110,11 @@ def eval_act(node):
     num_feat = in_shape[1:]
     in_numel = prod(num_feat)
 
-    flops = mem_r = mem_w = bs * in_numel 
+    macc = flops = mem_r = mem_w = bs * in_numel
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
     }
@@ -126,23 +134,28 @@ def eval_upsample(node):
         flops = 0
     if mode == "linear":
         flops = out_numel * 5 # 2 muls + 3 add
+        macc = out_numel * 3
     elif mode == "bilinear":
         flops = out_numel * 13 # 6 muls + 7 adds
+        macc = out_numel * 7
     elif mode == "bicubic":
         ops_solve_A = 224 # 128 muls + 96 adds
         ops_solve_p = 35 # 16 muls + 12 adds + 4 muls + 3 adds
         ops = (ops_solve_A + ops_solve_p)
         flops = out_numel * ops
+        macc = out_numel * 148
     elif mode == "trilinear":
         ops = (13 * 2 + 5)
         flops = out_numel * ops
+        macc = out_numel * 13 * 2
     flops = bs * flops
 
     mem_r = bs * (in_numel + params)
     mem_w = bs * out_numel
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
     }
@@ -156,14 +169,16 @@ def eval_linear(node):
     
     bias_ops = 1 if bias else 0
 
-    flops = bs * out_feat * (in_feat - 1 + bias_ops)
+    flops = bs * out_feat * (in_feat * 2 - 1 + bias_ops)
+    macc = bs* out_feat * (in_feat + bias_ops)
     params = out_feat * (in_feat + bias_ops)
 
     mem_r = bs * (in_feat + params)
     mem_w = bs * out_feat
 
     return {
-        'flops': int(flops),
+        'flops': flops,
+        'macc': macc,
         'mem_r': mem_r,
         'mem_w': mem_w,
         'params': params
@@ -172,6 +187,7 @@ def eval_linear(node):
 def eval_identity(node):
     return {
         'flops': 0,
+        'macc': 0,
         'mem_r': 0,
         'mem_w': 0,
     }
@@ -179,6 +195,7 @@ def eval_identity(node):
 def eval_nullop(node):
     return {
         'flops': 0,
+        'macc': 0,
         'mem_r': 0,
         'mem_w': 0,
     }

@@ -258,6 +258,8 @@ def hook_module_out(module, input, output):
         cur_node['dev_mem_alloc'] = DEV.get_current_mem() - cur_node['dev_mem']
         cur_node['dev_max_mem'] = DEV.get_max_mem()
         cur_node['dev_max_mem_alloc'] = cur_node['dev_max_mem'] - DEV.get_base_mem()
+        if CFG.frontend.reset_max_mem:
+            DEV.reset_max_mem()
     cur_node['fwd'] = 1 + (cur_node['fwd'] or 0)
     if default_node['hook_comp']:
         hook_compute_out(cur_node, input_shape, get_data_shape(output), CFG.frontend.mark_updated)
