@@ -31,91 +31,84 @@ def get_torch_max_mem(dev=None):
 
 
 class FrontendDevice():
-    def __init__(self, frontend, device):
-        super().__init__()
-        self.base_mem = 0
-        self.max_mem = 0
-        self.frontend = frontend
-        self.device = None
-        self.set_device(device)
-
-    def reset(self):
-        self.base_mem = self.get_current_mem()
+    base_mem = 0
+    max_mem = 0
+    frontend = None
+    device = None
     
-    def get_base_mem(self):
-        return self.base_mem
+    @staticmethod
+    def init(frontend, device):
+        FrontendDevice.base_mem = 0
+        FrontendDevice.max_mem = 0
+        FrontendDevice.frontend = frontend
+        FrontendDevice.device = None
+        FrontendDevice.set_device(device)
 
-    def get_current_mem(self):
-        if self.device == 'cpu':
+    @staticmethod
+    def reset():
+        FrontendDevice.base_mem = FrontendDevice.get_current_mem()
+    
+    @staticmethod
+    def get_base_mem():
+        return FrontendDevice.base_mem
+
+    @staticmethod
+    def get_current_mem():
+        if FrontendDevice.device == 'cpu':
             if psutil is None:
                 logger.error('psutil not installed')
                 return 0
             return psutil.Process(os.getpid()).memory_info().rss
-        if self.frontend == 'pytorch':
-            return get_torch_current_mem(self.device)
+        if FrontendDevice.frontend == 'pytorch':
+            return get_torch_current_mem(FrontendDevice.device)
         return 0
     
-    def get_max_mem(self):
-        if self.device == 'cpu':
+    @staticmethod
+    def get_max_mem():
+        if FrontendDevice.device == 'cpu':
             if not psutil is None:
                 return psutil.Process(os.getpid()).memory_info().rss
             else:
-                return self.get_current_mem()
-        if self.frontend == 'pytorch':
-            return get_torch_current_mem(self.device)
+                return FrontendDevice.get_current_mem()
+        if FrontendDevice.frontend == 'pytorch':
+            return get_torch_current_mem(FrontendDevice.device)
     
-    def reset_max_mem(self):
-        if self.frontend == 'pytorch':
+    @staticmethod
+    def reset_max_mem():
+        if FrontendDevice.frontend == 'pytorch':
             torch.cuda.reset_max_memory_allocated()
 
-    def get_synchronize(self):
-        if self.device == 'cpu':
+    @staticmethod
+    def get_synchronize():
+        if FrontendDevice.device == 'cpu':
             return lambda: None
         if torch.cuda.is_available():
             return torch.cuda.synchronize
         else:
             return lambda: None
     
-    def set_device(self, dev):
+    @staticmethod
+    def set_device(dev):
         if dev is None:
             dev = 'cpu'
-        self.device = dev
+        FrontendDevice.device = dev
 
 
-device = None
+init = FrontendDevice.init
 
+get_current_mem = FrontendDevice.get_current_mem
 
-def init(*args, **kwargs):
-    global device
-    device = FrontendDevice(*args, **kwargs)
+get_max_mem = FrontendDevice.get_max_mem
 
+reset_max_mem = FrontendDevice.reset_max_mem
 
-def get_current_mem():
-    return device.get_current_mem()
+get_base_mem = FrontendDevice.get_base_mem
 
+set_device = FrontendDevice.set_device
 
-def get_max_mem():
-    return device.get_max_mem()
+get_synchronize = FrontendDevice.get_synchronize
 
-
-def reset_max_mem():
-    return device.reset_max_mem()
-
-
-def get_base_mem():
-    return device.base_mem
-
-
-def set_device(dev):
-    device.set_device(dev)
-
-
-def get_synchronize():
-    return device.get_synchronize()
-
-
-def reset():
-    device.reset()
+reset = FrontendDevice.reset
 
 
 def add_node(node):
