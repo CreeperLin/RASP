@@ -75,7 +75,11 @@ def eval_pool(node):
     in_feat = in_shape[2:]
     if adapt:
         k = [in_d - (out_d-1) * in_d // out_d for in_d, out_d in zip(in_shape, out_shape)]
+        s = 1
         p = 0
+        node['kernel_size'] = k[-2:]
+        node['stride'] = s
+        node['padding'] = p
     else:
         k = node['kernel_size']
         s = node['stride']

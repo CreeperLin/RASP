@@ -25,6 +25,7 @@ class StatTreeNode():
         self._children = dict()
         self.stats = dict()
         self.parent = None
+        self.get = self.stats.get
     
     def __setitem__(self, k, v):
         self.stats[k] = v

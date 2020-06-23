@@ -58,8 +58,8 @@ def reset_stat(node):
     reset_timing_all(node)
 
 
-def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_only=True,
-         report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None):
+def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_stat=True, return_df=False,
+         report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None, keep_tree=False):
     excludes = [] if excludes is None else excludes
     includes = [] if includes is None else includes
     DEV.set_device(device)
@@ -88,14 +88,17 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
         reporter = summary_root
     else:
         raise ValueError('unsupported report type: {}'.format(report_type))
+    df = None
     if not reporter is None:
         sum_str, df = reporter(stats_tree, include_root, report_fields, includes, excludes)
         if not save_path is None:
             save_report(df, save_path)
-        if print_only: 
+        if print_stat: 
             print(sum_str)
-        else:
-            return sum_str, df
+    if not keep_tree:
+        destroy_stats_tree(module)
+    if return_df:
+        return df
 
 
 def get_batch_data(input_shape, inputs):
