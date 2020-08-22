@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from .. import device as DEV
 from .. import frontend as F
 

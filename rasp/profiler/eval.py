@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 def prod(arr):
     if not isinstance(arr, (tuple, list)):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from ..utils.reporter import report
 
 class RegressorDevice():

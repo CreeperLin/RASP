@@ -57,7 +57,7 @@ def main():
     
     for i, name in enumerate(model_names):
         model = models.__dict__[name]().to(device=device)
-        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_only=False)
+        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_stat=False, returns='sum, data')
         if args.verbose:
             print(summary)
         total_f = df.tail(1)

@@ -181,7 +181,7 @@ def main():
     
     for i, name in enumerate(ops):
         model = ops[name](chn_in, stride=1, affine=True)
-        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_only=False)
+        summary, df = rasp.stat(model, inputs=inputs, device=device, report_fields=fields, timing=args.timing, print_stat=False, returns='sum, data')
         if args.verbose:
             print(summary)
         rasp.profile_off(model)

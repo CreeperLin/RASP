@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from .eval import eval_compute_prop
 
 class Tape():

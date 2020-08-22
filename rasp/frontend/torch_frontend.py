@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import logging
 import torch
@@ -222,11 +221,7 @@ def hook_module_in(module, input):
     default_node = get_stats_node(module)
     input_shape = get_data_shape(input)
     cur_node = get_stats_node(module, input_shape)
-    if len(nodes_all) == 1:
-        set_stats_node(module, default_node, input_shape)
-        default_node.tape = Tape(node=default_node)
-        cur_node = default_node
-    elif cur_node is None:
+    if cur_node is None:
         cur_node = build_stats_node(module, default_node.name, hook=False, tape=True)
         cur_node.parent = default_node.parent
         cur_node._children = default_node._children

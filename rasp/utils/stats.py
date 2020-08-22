@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from ..profiler.tree import StatTreeNode, reset_timing_all
 from ..profiler.hook import Tape
 from ..utils.config import CFG
@@ -58,7 +57,7 @@ def reset_stat(node):
     reset_timing_all(node)
 
 
-def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_stat=True, return_df=False,
+def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_stat=True, returns=None,
          report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None, keep_tree=False):
     excludes = [] if excludes is None else excludes
     includes = [] if includes is None else includes
@@ -76,7 +75,7 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
         excludes.extend(['lat', 'net_lat', 'lat[%]', 'FLOPS'])
     if report_type is None:
         reporter = None
-    if report_type == 'all':
+    elif report_type == 'all':
         reporter = summary_all
     elif report_type == 'tape':
         reporter = summary_tape
@@ -97,8 +96,21 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
             print(sum_str)
     if not keep_tree:
         destroy_stats_tree(module)
-    if return_df:
-        return df
+    if not returns: return
+    ret_types = returns.split(',')
+    rets = []
+    for ret_type in ret_types:
+        ret_type = ret_type.strip()
+        if ret_type == 'data':
+            ret = df
+        elif ret_type == 'tree':
+            ret = stats_tree
+        elif ret_type == 'sum':
+            ret = sum_str
+        else:
+            raise ValueError('invalid return type: {}'.format(ret_type))
+        rets.append(ret)
+    return rets[0] if len(rets) == 1 else rets
 
 
 def get_batch_data(input_shape, inputs):

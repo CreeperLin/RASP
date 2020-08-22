@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 def reset_timing_all(node):
     if not node['timer'] is None:

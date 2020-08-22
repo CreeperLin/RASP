@@ -45,7 +45,7 @@ rasp.stat(model, input_shape=(1, 3, 224, 224), includes=['macc'], excludes=['flo
 Export DataFrame
 
 ```python
-summary, df = rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True, print_only=False)
+df = rasp.stat(model, input_shape=(1, 3, 224, 224), device='cuda', timing=True, print_stat=False, returns='data')
 ```
 
 Customize profiling parameters
@@ -66,7 +66,7 @@ rasp.stat(model, inputs=inputs, timing=True)
 Set different report type
 
 ```python
-for report_type in ['tape', 'subnodes', 'leaves', 'root', None]:
+for report_type in ['tape', 'node', 'leaves', 'root', None]:
     rasp.stat(model, input_shape=(1, 3, 224, 224), report_type=report_type, timing=True)
 ```
 
