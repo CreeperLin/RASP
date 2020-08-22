@@ -1,4 +1,3 @@
-
 def prod(arr):
     if not isinstance(arr, (tuple, list)):
         return arr
@@ -6,6 +5,7 @@ def prod(arr):
     for i in arr:
         ret *= i
     return ret
+
 
 def eval_conv(node):
     kernel_size = node['kernel_size']
@@ -19,7 +19,7 @@ def eval_conv(node):
     _, out_c, oh, ow = out_shape
     out_numel = out_c * oh * ow
     in_numel = in_c * ih * iw
-    
+
     kernel_numel = prod(kernel_size)
     bias_ops = 1 if bias else 0
     kernel_ops = kernel_numel
@@ -40,14 +40,13 @@ def eval_conv(node):
         'params': params,
     }
 
+
 def eval_bn(node):
     affine = node['affine']
-    running_stats = node['running_stats']
     in_shape = node['in_shape']
-    num_feat = node['num_feat']
     bs = in_shape[0]
     in_numel = prod(in_shape[1:])
-    
+
     affine_ops = 1 if affine else 0
 
     macc = bs * (affine_ops + 1) * in_numel
@@ -65,15 +64,18 @@ def eval_bn(node):
         'params': params
     }
 
+
 def eval_pool(node):
     ptype = node['pool_type']
     adapt = node['adaptive']
     params = node['params']
     in_shape = node['in_shape']
     out_shape = node['out_shape']
-    in_feat = in_shape[2:]
     if adapt:
-        k = [in_d - (out_d-1) * in_d // out_d for in_d, out_d in zip(in_shape, out_shape)]
+        k = [
+            in_d - (out_d - 1) * in_d // out_d
+            for in_d, out_d in zip(in_shape, out_shape)
+        ]
         s = 1
         p = 0
         node['kernel_size'] = k[-2:]
@@ -92,7 +94,7 @@ def eval_pool(node):
     bs = out_shape[0]
     out_numel = prod(out_shape[1:])
     in_numel = prod(in_shape[1:])
-    
+
     flops = bs * kernel_ops * out_numel
     macc = bs * kernel_numel * out_numel
 
@@ -106,6 +108,7 @@ def eval_pool(node):
         'mem_w': mem_w,
     }
 
+
 def eval_act(node):
     params = node['params']
     in_shape = node['in_shape']
@@ -113,7 +116,8 @@ def eval_act(node):
     num_feat = in_shape[1:]
     in_numel = prod(num_feat)
 
-    macc = flops = mem_r = mem_w = bs * in_numel
+    macc = flops = bs * in_numel
+    mem_r = mem_w = bs * (in_numel + params)
 
     return {
         'flops': flops,
@@ -121,6 +125,7 @@ def eval_act(node):
         'mem_r': mem_r,
         'mem_w': mem_w,
     }
+
 
 def eval_upsample(node):
     params = node['params']
@@ -136,14 +141,14 @@ def eval_upsample(node):
     if mode == "nearest":
         flops = 0
     if mode == "linear":
-        flops = out_numel * 5 # 2 muls + 3 add
+        flops = out_numel * 5  # 2 muls + 3 add
         macc = out_numel * 3
     elif mode == "bilinear":
-        flops = out_numel * 13 # 6 muls + 7 adds
+        flops = out_numel * 13  # 6 muls + 7 adds
         macc = out_numel * 7
     elif mode == "bicubic":
-        ops_solve_A = 224 # 128 muls + 96 adds
-        ops_solve_p = 35 # 16 muls + 12 adds + 4 muls + 3 adds
+        ops_solve_A = 224  # 128 muls + 96 adds
+        ops_solve_p = 35  # 16 muls + 12 adds + 4 muls + 3 adds
         ops = (ops_solve_A + ops_solve_p)
         flops = out_numel * ops
         macc = out_numel * 148
@@ -163,17 +168,18 @@ def eval_upsample(node):
         'mem_w': mem_w,
     }
 
+
 def eval_linear(node):
     in_feat = node['in_feat']
     out_feat = node['out_feat']
     bias = node['bias']
     in_shape = node['in_shape']
     bs = in_shape[0]
-    
+
     bias_ops = 1 if bias else 0
 
     flops = bs * out_feat * (in_feat * 2 - 1 + bias_ops)
-    macc = bs* out_feat * (in_feat + bias_ops)
+    macc = bs * out_feat * (in_feat + bias_ops)
     params = out_feat * (in_feat + bias_ops)
 
     mem_r = bs * (in_feat + params)
@@ -187,6 +193,7 @@ def eval_linear(node):
         'params': params
     }
 
+
 def eval_identity(node):
     return {
         'flops': 0,
@@ -194,6 +201,7 @@ def eval_identity(node):
         'mem_r': 0,
         'mem_w': 0,
     }
+
 
 def eval_nullop(node):
     return {
@@ -232,7 +240,8 @@ def get_evaluators(ntype, default=None):
 
 
 def eval_compute_prop(node):
-    if node['compute_updated']: return
+    if node['compute_updated']:
+        return
     assert not node['in_shape'] is None
     ntype = node['type']
     stdtype = node['stdtype']

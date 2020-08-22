@@ -1,14 +1,8 @@
 from .. import device as DEV
 from .. import frontend as F
 
+
 class Dotdict(dict):
-    """
-    a dictionary that supports dot notation 
-    as well as dictionary access notation 
-    usage: d = DotDict() or d = DotDict({'val1':'first'})
-    set attributes: d.val2 = 'second' or d['val2'] = 'second'
-    get attributes: d.val2 or d['val2']
-    """
     __getattr__ = dict.__getitem__
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
@@ -20,8 +14,9 @@ class Dotdict(dict):
                 value = Dotdict(value)
             self[key] = value
 
+
 default_conf = {
-    'frontend':{
+    'frontend': {
         'type': 'pytorch',
         'args': {},
         'stat_mem': False,
@@ -42,20 +37,21 @@ default_conf = {
             'frontend': 'pytorch',
             'device': None,
         },
-    }, 
+    },
     'analysis': {
         'regress_model': 'linear'
     }
 }
+
 
 class Config():
     def __getattr__(self, k):
         global global_config
         try:
             return global_config.__getattr__(k)
-        except:
+        except AttributeError:
             return None
-    
+
     def __setattr__(self, k, v):
         global global_config
         global_config.__setattr__(k, v)
@@ -67,10 +63,13 @@ class Config():
     def __init__(self):
         pass
 
+
 CFG = Config()
+
 
 def set_default_config():
     return set_config(default_conf)
+
 
 def set_config(conf):
     global global_config
@@ -83,6 +82,7 @@ def set_config(conf):
     DEV.load_device(global_config.device)
     DEV.init(**global_config.device.get('args', {}))
     return CFG
+
 
 def get_config():
     global global_config

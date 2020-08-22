@@ -9,13 +9,15 @@ except ImportError:
 
 logger = logging.getLogger('rasp')
 
+
 def get_torch_current_mem(dev=None):
     if dev == 'cuda':
         if not torch.cuda.is_available():
             logger.error('cuda unavailable')
             return 0
         gpu_mem = torch.cuda.memory_allocated()
-        if torch.cuda.max_memory_allocated() != 0: return gpu_mem
+        if torch.cuda.max_memory_allocated() != 0:
+            return gpu_mem
     else:
         logger.error('unsupported device: {}'.format(dev))
         return 0
@@ -25,7 +27,8 @@ def get_torch_max_mem(dev=None):
     if dev == 'cuda':
         if torch.cuda.is_available():
             max_mem = torch.cuda.max_memory_allocated()
-            if max_mem != 0: return max_mem
+            if max_mem != 0:
+                return max_mem
     return get_torch_current_mem(dev)
 
 
@@ -34,7 +37,7 @@ class FrontendDevice():
     max_mem = 0
     frontend = None
     device = None
-    
+
     @staticmethod
     def init(frontend, device):
         FrontendDevice.base_mem = 0
@@ -46,7 +49,7 @@ class FrontendDevice():
     @staticmethod
     def reset():
         FrontendDevice.base_mem = FrontendDevice.get_current_mem()
-    
+
     @staticmethod
     def get_base_mem():
         return FrontendDevice.base_mem
@@ -61,17 +64,17 @@ class FrontendDevice():
         if FrontendDevice.frontend == 'pytorch':
             return get_torch_current_mem(FrontendDevice.device)
         return 0
-    
+
     @staticmethod
     def get_max_mem():
         if FrontendDevice.device == 'cpu':
-            if not psutil is None:
+            if psutil is not None:
                 return psutil.Process(os.getpid()).memory_info().rss
             else:
                 return FrontendDevice.get_current_mem()
         if FrontendDevice.frontend == 'pytorch':
             return get_torch_current_mem(FrontendDevice.device)
-    
+
     @staticmethod
     def reset_max_mem():
         if FrontendDevice.frontend == 'pytorch':
@@ -85,7 +88,7 @@ class FrontendDevice():
             return torch.cuda.synchronize
         else:
             return lambda: None
-    
+
     @staticmethod
     def set_device(dev):
         if dev is None:

@@ -3,6 +3,7 @@ import torch.nn as nn
 import argparse
 import rasp
 
+
 class RectNet(nn.Module):
     def __init__(self, C, w, l):
         super().__init__()
@@ -13,7 +14,7 @@ class RectNet(nn.Module):
                 stack.append(nn.Conv2d(C, C, 3, 1, 1))
             stages.append(stack)
         self.stages = stages
-    
+
     def forward(self, x):
         states_out = []
         keep_states = False
@@ -27,13 +28,14 @@ class RectNet(nn.Module):
             states_out.append(stack_out[-1])
         return sum(states_out)
 
+
 def get_device(devdesc):
     torch.manual_seed(1)
     if devdesc == 'all':
         dev = list(range(torch.cuda.device_count()))
     elif devdesc != 'cpu':
         dev = [int(s) for s in devdesc.split(',')]
-    if devdesc == 'cpu' or len(dev)==0:
+    if devdesc == 'cpu' or len(dev) == 0:
         dev = None
         device = torch.device('cpu')
         return device, dev
@@ -44,16 +46,27 @@ def get_device(devdesc):
     torch.backends.cudnn.benchmark = False
     return device, dev
 
+
 def main():
     parser = argparse.ArgumentParser(description='profile torchvision models')
-    parser.add_argument('-d','--device',type=str,default="all", help="device ids")
-    parser.add_argument('-v','--verbose',action='store_true', help="verbose msg")
-    parser.add_argument('-t','--timing',action='store_true', help="enable timing")
+    parser.add_argument('-d',
+                        '--device',
+                        type=str,
+                        default="all",
+                        help="device ids")
+    parser.add_argument('-v',
+                        '--verbose',
+                        action='store_true',
+                        help="verbose msg")
+    parser.add_argument('-t',
+                        '--timing',
+                        action='store_true',
+                        help="enable timing")
     args = parser.parse_args()
-    
+
     device, devlist = get_device(args.device)
 
-    config = rasp.set_config({
+    rasp.set_config({
         'profile': {
             'batch_size': 1,
             'num_batches': 5,
@@ -63,10 +76,12 @@ def main():
             'verbose': args.verbose,
         },
     })
-    
-    fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
-             'lat', 'net_lat', 'lat[%]', 'flops', 
-             'mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']
+
+    fields = [
+        'name', 'type', 'in_shape', 'out_shape', 'params', 'lat', 'net_lat',
+        'lat[%]', 'flops', 'mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc',
+        'dev_mem_delta'
+    ]
 
     C = 16
     w = 4
@@ -86,6 +101,7 @@ def main():
     summary, _ = rasp.summary_node(stats, report_fields=fields)
     print(summary)
     rasp.profile_off(model)
+
 
 if __name__ == '__main__':
     main()

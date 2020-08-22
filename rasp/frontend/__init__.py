@@ -1,4 +1,3 @@
-import sys
 import importlib
 _FRONTEND = 'pytorch'
 
@@ -13,12 +12,10 @@ required_entries = [
     'get_random_data',
 ]
 
+
 def load_frontend(config):
     global _FRONTEND
-    try:
-        _FRONTEND = config.type
-    except:
-        pass
+    _FRONTEND = config.get('type', _FRONTEND)
 
     if _FRONTEND == 'pytorch':
         module_name = '.torch_frontend'
@@ -29,7 +26,7 @@ def load_frontend(config):
     else:
         module_name = _FRONTEND
         package = config.get('package', None)
-    
+
     # try:
     frontend_module = importlib.import_module(module_name, package)
     entries = frontend_module.__dict__
@@ -39,8 +36,7 @@ def load_frontend(config):
     namespace = globals()
     for k, v in entries.items():
         namespace[k] = v
-    # except ImportError as e:
-        # raise ValueError('Unable to import frontend {}: {}'.format(_FRONTEND, str(e)))
+
 
 def frontend():
     return _FRONTEND

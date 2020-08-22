@@ -1,9 +1,8 @@
-from ..profiler.tree import StatTreeNode, reset_timing_all
-from ..profiler.hook import Tape
+from ..profiler.tree import reset_timing_all
 from ..utils.config import CFG
 from ..utils.time import Timer, get_cpu_time
-from ..utils.reporter import report, save_report, summary, summary_leaves,\
-                             summary_all, summary_tape, summary_node, summary_root
+from ..utils.reporter import save_report, summary_all, summary_leaves,\
+                             summary_tape, summary_node, summary_root
 from .. import frontend as F
 from .. import device as DEV
 
@@ -12,12 +11,6 @@ def build_stats_tree(module):
     stats_tree = F.get_stats_node(module)
     if stats_tree is None:
         stats_tree = F.reg_stats_node(module)
-        # root = StatTreeNode('')
-        # root.add_child(stats_tree.name, stats_tree)
-        # root.tape = Tape(node=root)
-        # root.tape.accessed = True
-    # else:
-        # root = stats_tree.parent
     return stats_tree
 
 
@@ -57,8 +50,22 @@ def reset_stat(node):
     reset_timing_all(node)
 
 
-def stat(module, input_shape=None, inputs=None, device=None, compute=True, timing=False, memory=False, print_stat=True, returns=None,
-         report_type='tape', include_root=False, report_fields=None, includes=None, excludes=None, save_path=None, keep_tree=False):
+def stat(module,
+         input_shape=None,
+         inputs=None,
+         device=None,
+         compute=True,
+         timing=False,
+         memory=False,
+         print_stat=True,
+         returns=None,
+         report_type='tape',
+         include_root=False,
+         report_fields=None,
+         includes=None,
+         excludes=None,
+         save_path=None,
+         keep_tree=False):
     excludes = [] if excludes is None else excludes
     includes = [] if includes is None else includes
     DEV.set_device(device)
@@ -88,15 +95,17 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
     else:
         raise ValueError('unsupported report type: {}'.format(report_type))
     df = None
-    if not reporter is None:
-        sum_str, df = reporter(stats_tree, include_root, report_fields, includes, excludes)
-        if not save_path is None:
+    if reporter is not None:
+        sum_str, df = reporter(stats_tree, include_root, report_fields,
+                               includes, excludes)
+        if save_path is not None:
             save_report(df, save_path)
-        if print_stat: 
+        if print_stat:
             print(sum_str)
     if not keep_tree:
         destroy_stats_tree(module)
-    if not returns: return
+    if not returns:
+        return
     ret_types = returns.split(',')
     rets = []
     for ret_type in ret_types:
@@ -114,8 +123,8 @@ def stat(module, input_shape=None, inputs=None, device=None, compute=True, timin
 
 
 def get_batch_data(input_shape, inputs):
-    if not inputs is None:
-        if not input_shape is None:
+    if inputs is not None:
+        if input_shape is not None:
             raise ValueError("input_shape is not none")
         return inputs
     if input_shape is None:
@@ -134,22 +143,19 @@ def profile_batch(module, inputs, device):
     warmup_batches = CFG.profile.warmup_batches
     timer = Timer(time_src=get_cpu_time, synch=DEV.get_synchronize())
     tot_batches = num_batches + warmup_batches
-    verbose = CFG.profile.verbose
     with F.get_ctx(module, inputs, device) as ctx:
         for i in range(tot_batches):
-            pcnt = round(100 * (i+1) / tot_batches)
-            if verbose and pcnt % 25 == 0: print ('RASP prof: {}%'.format(pcnt))
             timer.rec()
             ctx.run()
-            if i < warmup_batches: continue
+            if i < warmup_batches:
+                continue
             timer.rec(include=True)
-    # print(timer.stat())
     return timer.mean()
 
 
 def stat_memory_on():
     CFG.frontend.stat_mem = True
-    
+
 
 def stat_memory_off():
     CFG.frontend.stat_mem = False
@@ -163,7 +169,7 @@ def profile_compute_once(module, input_shape=None, inputs=None, device=None):
     return stats_tree
 
 
-def profile_compute(module):
+def profile_compute(module, input_shape=None, inputs=None, device=None):
     inputs = get_batch_data(input_shape, inputs)
     F.run(module, inputs, device)
 
@@ -181,11 +187,8 @@ def profile_compute_off(module):
 
 def profile_timing_once(module, input_shape=None, inputs=None, device=None):
     inputs = get_batch_data(input_shape, inputs)
-    # timing w/o hook
-    # lat = profile_batch(module, inputs)
-    # timing w/ hook
     stats_tree = profile_timing_on(module)
-    lat = profile_batch(module, inputs, device)
+    profile_batch(module, inputs, device)
     profile_timing_off(module)
     return stats_tree
 
@@ -221,11 +224,11 @@ def profile_off(module):
 class prof_timing():
     def __init__(self, module):
         self.module = module
-    
+
     def __enter__(self, module):
         self.stats_tree = profile_timing_on(self.module)
         return self.stats_tree
-    
+
     def __exit__(self):
         profile_off(self.module)
 
@@ -233,21 +236,22 @@ class prof_timing():
 class prof_compute():
     def __init__(self, module):
         self.module = module
-    
+
     def __enter__(self, module):
         self.stats_tree = profile_compute_on(self.module)
         return self.stats_tree
-    
+
     def __exit__(self):
         profile_off(self.module)
+
 
 class prof_all():
     def __init__(self, module):
         self.module = module
-    
+
     def __enter__(self, module):
         self.stats_tree = profile_on(self.module)
         return self.stats_tree
-    
+
     def __exit__(self):
         profile_off(self.module)

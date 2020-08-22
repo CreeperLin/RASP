@@ -1,4 +1,3 @@
-import sys
 import importlib
 
 _DEVICE = 'frontend'
@@ -9,10 +8,11 @@ required_entries = [
     'add_node',
 ]
 
+
 def load_device(config):
     global _DEVICE
     _DEVICE = config.get('type', 'frontend')
-    
+
     if _DEVICE == 'frontend':
         module_name = '.frontend_device'
         package = 'rasp.device'
@@ -20,7 +20,7 @@ def load_device(config):
         module_name = '.regressor_device'
         package = 'rasp.device'
     else:
-        module_name = '.'+_DEVICE
+        module_name = '.' + _DEVICE
         package = config.get('package', '')
     # Try and load external device.
     try:
@@ -33,7 +33,9 @@ def load_device(config):
         for k, v in entries.items():
             namespace[k] = v
     except ImportError as e:
-        raise ValueError('Unable to import device : {} {}'.format(_DEVICE, str(e)))
+        raise ValueError('Unable to import device : {} {}'.format(
+            _DEVICE, str(e)))
+
 
 def device():
     return _DEVICE

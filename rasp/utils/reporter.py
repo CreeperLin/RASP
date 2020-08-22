@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-import numpy as np
 
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_rows', 10000)
 pd.set_option('display.max_columns', 10000)
 
 _units = {}
+
 
 def add_unit(field_name, unit):
     _units[field_name] = unit
@@ -56,16 +56,34 @@ def round_value(value, binary=False, prec=2):
     return str(round(value, prec))
 
 
-def report(collected_nodes, include_root=False, report_fields=None, includes=None, excludes=None):
-    if len(collected_nodes)==0: return None
-    all_fields = ['name', 'type', 'in_shape', 'out_shape', 'params',
-            'lat', 'net_lat', 'lat[%]', 'flops', 'FLOPS', 'mem_r', 'mem_w', 'mem_rw',
-            # 'dev_mem_alloc', 'dev_mem_delta'
-            ]
-    if report_fields is None: report_fields = all_fields
-    if not excludes is None:
-        report_fields = [f for f in report_fields if not f in excludes]
-    if not includes is None:
+def report(collected_nodes,
+           include_root=False,
+           report_fields=None,
+           includes=None,
+           excludes=None):
+    if len(collected_nodes) == 0:
+        return None
+    all_fields = [
+        'name',
+        'type',
+        'in_shape',
+        'out_shape',
+        'params',
+        'lat',
+        'net_lat',
+        'lat[%]',
+        'flops',
+        'FLOPS',
+        'mem_r',
+        'mem_w',
+        'mem_rw',
+        # 'dev_mem_alloc', 'dev_mem_delta'
+    ]
+    if report_fields is None:
+        report_fields = all_fields
+    if excludes is not None:
+        report_fields = [f for f in report_fields if f not in excludes]
+    if includes is not None:
         report_fields.extend(includes)
     if include_root:
         root = collected_nodes[0].root
@@ -75,7 +93,9 @@ def report(collected_nodes, include_root=False, report_fields=None, includes=Non
         series = []
         for f in report_fields:
             if f == 'mem_rw':
-                val = numel_to_bytes((node['mem_r'] or 0.0) + (node['mem_w'] or 0.0), node['dtype'])
+                val = numel_to_bytes(
+                    (node['mem_r'] or 0.0) + (node['mem_w'] or 0.0),
+                    node['dtype'])
             elif f == 'mem_r' or f == 'mem_w':
                 val = numel_to_bytes(node[f], node['dtype'])
             elif node[f] is None:
@@ -92,11 +112,15 @@ def report(collected_nodes, include_root=False, report_fields=None, includes=Non
     # df = df.fillna(0)
     df = df.fillna(' ')
 
-    df.drop([f for f in df.columns if not f in report_fields],axis=1,inplace=True)
+    df.drop([f for f in df.columns if f not in report_fields],
+            axis=1,
+            inplace=True)
     return df
 
+
 def summary(df):
-    if df is None: return '', None
+    if df is None:
+        return '', None
     df_fields = df.columns
     rep_fields = list(df_fields)
     if 'lat[%]' in df_fields and 'net_lat' in df_fields:
@@ -108,11 +132,9 @@ def summary(df):
     for f in rep_fields:
         try:
             if f == 'FLOPS':
-                if df['net_lat'].sum() > 1e-7:
-                    tot_val = 1000 * df['flops'].sum() / df['net_lat'].sum()
-                else:
-                    tot_val = 0
-            elif f in ['name', 'type', 'in_shape', 'out_shape']: 
+                tot_val = 1000 * df['flops'].sum() / (df['net_lat'].sum() +
+                                                      1e-7)
+            elif f in ['name', 'type', 'in_shape', 'out_shape']:
                 continue
             else:
                 tot_val = df[f].sum()
@@ -128,31 +150,41 @@ def summary(df):
     sum_str += "=" * len(str(df).split('\n')[0])
     sum_str += '\n'
     for f, v in zip(agg_fields, agg_val):
-        if f in ['name', 'type', 'in_shape', 'out_shape', 'lat[%]']: continue
+        if f in ['name', 'type', 'in_shape', 'out_shape', 'lat[%]']:
+            continue
         binary = False
         if f in ['mem_r', 'mem_w', 'mem_rw', 'dev_mem_alloc', 'dev_mem_delta']:
             binary = True
-        sum_str += "Total {}: {} {}\n".format(f, round_value(v, binary, prec=2), get_unit(f))
+        sum_str += "Total {}: {} {}\n".format(f, round_value(v, binary,
+                                                             prec=2),
+                                              get_unit(f))
     return sum_str, df
+
 
 def summary_leaves(node, *args, **kwargs):
     return summary(report(list(node.leaves()), *args, **kwargs))
 
+
 def summary_all(node, *args, **kwargs):
     return summary(report(list(node.subnodes()), *args, **kwargs))
+
 
 def summary_tape(node, *args, **kwargs):
     return summary(report(list(node.tape.items_all), *args, **kwargs))
 
+
 def summary_node(node, *args, **kwargs):
     return summary(report([node], *args, **kwargs))
+
 
 def summary_root(node, *args, **kwargs):
     return summary(report([node.root], *args, **kwargs))
 
+
 def load_report(path):
-    df = pd.read_csv(path, converters={'name':str})
+    df = pd.read_csv(path, converters={'name': str})
     return df
+
 
 def save_report(report, savepath):
     save_dir = os.path.split(savepath)[0]
