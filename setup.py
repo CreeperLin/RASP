@@ -23,7 +23,7 @@ setup(
     description='Runtime Analyzer and Statistical Profiler for NN',
     long_description=readme,
     long_description_content_type='text/markdown',
-    license=license,
+    license='MIT',
     packages=find_packages(exclude=('test')),
     install_requires=requirements,
     classifiers=[
